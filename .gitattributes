@@ -1,0 +1,6 @@
+# Normalize line endings in the repo; check out as-is per platform defaults.
+* text=auto
+*.png binary
+*.ico binary
+*.pdf binary
+*.crt text

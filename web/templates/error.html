@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block title %}{{ title }}{% endblock %}
+{% block content %}
+<h1 class="screen-title">{{ title }}</h1>
+<div class="card">
+  <p class="form-error">{{ message }}</p>
+  <p><a href="/" class="btn">Back to Home</a></p>
+</div>
+{% endblock %}

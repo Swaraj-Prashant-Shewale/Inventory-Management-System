@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}Sign in{% endblock %}
+{% block content %}
+<div class="auth-wrap">
+  <div class="auth-card">
+    <div class="auth-brand">
+      <span class="brand-mark large" aria-hidden="true"></span>
+      <h1>Inventory Management</h1>
+      <p class="muted">Multi-warehouse stock, purchasing, shipping and analytics.</p>
+    </div>
+    <form method="post" action="/login" class="auth-form">
+      <h2>Sign in</h2>
+      <input type="hidden" name="csrf_token" value="{{ login_csrf }}">
+      {% if error %}<p class="form-error" role="alert">{{ error }}</p>{% endif %}
+      <label>Username
+        <input type="text" name="username" value="{{ username|default('') }}"
+               autocomplete="username" autofocus required>
+      </label>
+      <label>Password
+        <input type="password" name="password" autocomplete="current-password" required>
+      </label>
+      <button type="submit" class="btn primary wide">Sign in</button>
+    </form>
+  </div>
+</div>
+{% endblock %}

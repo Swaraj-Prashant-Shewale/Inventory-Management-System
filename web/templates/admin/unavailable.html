@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block title %}Not available{% endblock %}
+{% block content %}
+<div class="auth-wrap">
+  <div class="auth-card single">
+    <h2>Platform administration is not available</h2>
+    <p class="muted">Multi-tenant mode needs the PostgreSQL backend. This server is
+      running the single-tenant SQLite development mode.</p>
+  </div>
+</div>
+{% endblock %}

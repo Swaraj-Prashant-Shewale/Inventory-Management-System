@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block title %}Platform admin{% endblock %}
+{% block content %}
+<div class="auth-wrap">
+  <div class="auth-card single">
+    <form method="post" action="/admin/login" class="auth-form">
+      <h2>Platform administration</h2>
+      <p class="muted">Operator sign-in — not for client companies.</p>
+      <input type="hidden" name="csrf_token" value="{{ login_csrf }}">
+      {% if error %}<p class="form-error" role="alert">{{ error }}</p>{% endif %}
+      <label>Username
+        <input type="text" name="username" value="{{ username|default('') }}" autofocus required>
+      </label>
+      <label>Password
+        <input type="password" name="password" required>
+      </label>
+      <button type="submit" class="btn primary wide">Sign in</button>
+    </form>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Inventory{% endblock %} — {{ tenant.display_name if tenant else "Inventory Management System" }}</title>
+  <link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+{% if user %}
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-mark" aria-hidden="true"></span>
+      <span class="brand-name">{{ tenant.display_name if tenant else "Inventory" }}</span>
+    </div>
+    <form class="search" action="/inventory" method="get" role="search">
+      <input type="search" name="q" placeholder="Search items…" value="{{ q|default('') }}">
+    </form>
+    <div class="userbox">
+      <span class="user-name">{{ user.full_name }}</span>
+      <span class="user-role">{{ user.role_label }}</span>
+    </div>
+  </header>
+  <nav class="mainnav">
+    <a href="/" class="{{ 'active' if active == 'home' else '' }}">Home</a>
+    <a href="/coming/shipping" class="{{ 'active' if active == 'shipping' else '' }}">Shipping</a>
+    <a href="/coming/receiving" class="{{ 'active' if active == 'receiving' else '' }}">Receiving</a>
+    <a href="/inventory" class="{{ 'active' if active == 'inventory' else '' }}">Inventory</a>
+    <a href="/coming/logs" class="{{ 'active' if active == 'logs' else '' }}">Recent Logs</a>
+    {% if can(auth.PERM_VIEW_ANALYTICS) %}
+    <a href="/coming/analytics" class="{{ 'active' if active == 'analytics' else '' }}">Analytics</a>
+    {% endif %}
+    <span class="nav-spacer"></span>
+    <a href="/coming/settings">Settings</a>
+    <form method="post" action="/logout" class="inline">
+      <button type="submit" class="nav-signout">Sign out</button>
+    </form>
+  </nav>
+{% endif %}
+<main class="page">
+  {% block content %}{% endblock %}
+</main>
+</body>
+</html>

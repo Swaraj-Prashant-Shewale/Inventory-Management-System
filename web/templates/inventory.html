@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% set active = 'inventory' %}
+{% block title %}Inventory{% endblock %}
+{% block content %}
+<div class="screen-head">
+  <h1 class="screen-title">INVENTORY</h1>
+  <span class="muted">{{ rows|length }} item(s)
+    {% if low_count %} · {{ low_count }} below minimum{% endif %}
+    {% if show_cost %} · stock value ₹{{ "{:,.2f}".format(total_value) }}{% endif %}
+  </span>
+</div>
+
+<form method="get" action="/inventory" class="filter-row">
+  <input type="search" name="q" placeholder="Search name, SKU or barcode…" value="{{ q }}">
+  <select name="warehouse">
+    <option value="0">All warehouses</option>
+    {% for w in warehouses %}
+    <option value="{{ w.id }}" {{ 'selected' if selected and selected.id == w.id else '' }}>
+      {{ w.name }} ({{ w.code }})</option>
+    {% endfor %}
+  </select>
+  <label class="check"><input type="checkbox" name="low" value="1" {{ 'checked' if low else '' }}> Below minimum only</label>
+  <label class="check"><input type="checkbox" name="inactive" value="1" {{ 'checked' if inactive else '' }}> Include inactive</label>
+  <button type="submit" class="btn">Apply</button>
+</form>
+
+<div class="card table-card">
+  <div class="table-scroll">
+    <table>
+      <thead>
+        <tr>
+          <th>Product</th>
+          <th>SKU</th>
+          <th class="num">On Hand</th>
+          <th class="num">Available</th>
+          <th class="num">Min</th>
+          {% if show_cost %}<th class="num">Avg Cost</th><th class="num">Value</th>{% endif %}
+          <th>Supplier</th>
+          <th>Location</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in rows %}
+        <tr class="{{ 'low' if r.low else '' }}">
+          <td class="strong">{{ r.item.name }}</td>
+          <td class="muted">{{ r.item.sku }}</td>
+          <td class="num {{ 'danger strong' if r.low else '' }}">{{ "{:g}".format(r.on_hand) }}</td>
+          <td class="num muted">{{ "{:g}".format(r.available) }}</td>
+          <td class="num">{{ "{:g}".format(r.minimum) }}</td>
+          {% if show_cost %}
+          <td class="num">₹{{ "{:,.2f}".format(r.item.avg_cost or 0) }}</td>
+          <td class="num">₹{{ "{:,.2f}".format(r.value) }}</td>
+          {% endif %}
+          <td>{{ r.item.preferred_supplier.name if r.item.preferred_supplier else "—" }}</td>
+          <td>{{ r.location }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="9" class="empty">No items match these filters.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+<p class="muted small">Creating and editing items on the web arrives in phase W2 —
+  the engine behind it is already live.</p>
+{% endblock %}

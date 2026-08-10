@@ -1,0 +1,21 @@
+PySide6==6.10.2
+peewee==4.0.0
+psycopg2-binary==2.9.11
+python-dotenv==1.2.1
+
+# Documents and export
+reportlab
+openpyxl
+python-barcode
+Pillow
+
+# Web application
+fastapi
+uvicorn[standard]
+jinja2
+python-multipart
+itsdangerous
+httpx
+
+# Packaging (desktop build, being retired once the web app is live)
+pyinstaller==6.19.0

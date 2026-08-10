@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% set active = 'home' %}
+{% block title %}Home{% endblock %}
+{% block content %}
+<h1 class="screen-title">HOME</h1>
+
+<div class="tile-row">
+  <a class="tile" href="/inventory">
+    <span class="tile-value">{{ counts.items }}</span>
+    <span class="tile-label">Items</span>
+  </a>
+  <a class="tile" href="/coming/receiving">
+    <span class="tile-value">{{ counts.open_purchases }}</span>
+    <span class="tile-label">Open purchase orders</span>
+  </a>
+  <a class="tile" href="/coming/shipping">
+    <span class="tile-value">{{ counts.open_sales }}</span>
+    <span class="tile-label">Open sales orders</span>
+  </a>
+  {% if stock_value is not none %}
+  <div class="tile accent">
+    <span class="tile-value">₹{{ "{:,.0f}".format(stock_value) }}</span>
+    <span class="tile-label">Stock value</span>
+  </div>
+  {% endif %}
+</div>
+
+<section class="card">
+  <div class="card-head">
+    <h2>Reminders</h2>
+    <span class="muted">{{ reminders|length }} open</span>
+  </div>
+  {% if reminders %}
+  <ul class="reminder-list">
+    {% for reminder in reminders %}
+    <li class="reminder {{ 'overdue' if reminder.due_date and reminder.due_date < now_date else '' }}">
+      <span class="reminder-date">{{ reminder.due_date.strftime("%d %b") if reminder.due_date else "—" }}</span>
+      <span class="reminder-title">{{ reminder.title }}</span>
+    </li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <p class="muted">Nothing outstanding. Low stock, late purchase orders and expiring
+    batches appear here automatically.</p>
+  {% endif %}
+</section>
+{% endblock %}

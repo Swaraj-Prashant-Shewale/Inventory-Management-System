@@ -1,0 +1,35 @@
+# Secrets — never commit
+.env
+web_secret.key
+*.key
+
+# Local databases
+*.db
+*.db-wal
+*.db-shm
+*.sqlite3
+
+# Logs and generated documents
+app.log
+documents/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# PyInstaller
+build/
+dist/
+*.spec
+
+# Editors / OS
+.vscode/
+.idea/
+Thumbs.db
+desktop.ini
+
+# The Supabase CA is a public certificate, not a secret, and every warehouse PC needs
+# it — so it is committed and shipped deliberately.
+!certs/supabase-ca.crt
