@@ -3,6 +3,9 @@
 web_secret.key
 *.key
 
+# Personal notes — keep local
+HOW_TO_UPLOAD_TO_GITHUB.txt
+
 # Local databases
 *.db
 *.db-wal
