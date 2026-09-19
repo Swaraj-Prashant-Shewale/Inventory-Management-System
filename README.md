@@ -179,6 +179,9 @@ if you suspect a breach. In short:
 - The web sign-in and `/admin` panel are **rate limited per client IP** (429 before any
   PBKDF2 work), and the `/admin` panel supports **TOTP two-factor**
   (`manage_platform.py admin-2fa`).
+- Repository and release hygiene excludes `.env`, provider metadata, session keys,
+  databases, logs, generated documents and binaries. Publish only a freshly built
+  `dist/InventoryManagementSystem/` folder, and never include its runtime `.env`.
 
 ## Packaging
 
