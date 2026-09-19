@@ -1,16 +1,17 @@
-"""The signed-in screens: dashboard and inventory. More arrive in web phase W2."""
+"""Core signed-in screens: dashboard, inventory, and stock movement entry."""
 import logging
 import time
 from collections import defaultdict
 from decimal import Decimal
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Form, Request
 from peewee import JOIN
 
 from database.connection import db
 
 from database.models import (
     Customer,
+    Direction,
     Item,
     PurchaseOrder,
     PurchaseStatus,
@@ -21,8 +22,15 @@ from database.models import (
     Uom,
     Warehouse,
 )
-from services import alerts, auth, inventory
-from web.context import render, require_login, resolve_user
+from services import alerts, auth, inventory, lab_stock
+from web.context import (
+    check_csrf,
+    forbidden,
+    redirect,
+    render,
+    require_login,
+    resolve_user,
+)
 
 log = logging.getLogger(__name__)
 router = APIRouter()
@@ -78,7 +86,7 @@ def home(request: Request):
 
 @router.get("/inventory")
 def inventory_list(request: Request, q: str = "", warehouse: int = 0,
-                   low: int = 0, inactive: int = 0):
+                   low: int = 0, inactive: int = 0, saved: str = ""):
     context = resolve_user(request)
     blocked = require_login(context)
     if blocked is not None:
@@ -156,31 +164,180 @@ def inventory_list(request: Request, q: str = "", warehouse: int = 0,
                   rows=rows, warehouses=warehouses, selected=selected,
                   q=term, low=low, inactive=inactive,
                   show_cost=show_cost, total_value=total_value,
-                  low_count=low_count)
+                  low_count=low_count, saved=(saved or "").strip())
 
 
-COMING = {
-    "shipping": ("Shipping — Exports",
-                 "Sales orders, fulfilment, GST invoices and payments arrive on the "
-                 "web in phase W2. The business engine already runs them — only these "
-                 "pages are pending."),
-    "receiving": ("Receiving — Imports",
-                  "Purchase orders and goods receipts arrive on the web in phase W2."),
-    "logs": ("Recent Logs",
-             "The stock movement trail arrives on the web in phase W2. Every movement "
-             "is already being recorded."),
-    "analytics": ("Analytics",
-                  "Sales, profit and trend dashboards arrive on the web in phase W3."),
-    "settings": ("Settings",
-                 "Master data management on the web arrives in phase W2."),
-}
+def _lab_page(context, *, direction=Direction.IN, values=None, error=None,
+              review=None, saved=None, status_code=200):
+    items = list(Item.select().where(
+        Item.is_active == True  # noqa: E712
+    ).order_by(Item.name))
+    warehouses = list(Warehouse.select().where(
+        Warehouse.is_active == True  # noqa: E712
+    ).order_by(Warehouse.name))
+    selected_warehouse = (
+        context.user.warehouse_id if context.user.warehouse_id
+        else (warehouses[0].id if warehouses else 0)
+    )
+    form = {
+        "direction": (direction if direction in (Direction.IN, Direction.OUT)
+                      else Direction.IN),
+        "item_code": "",
+        "warehouse_id": str(selected_warehouse),
+        "quantity": "1",
+        "unit_cost": "",
+        "lot_number": "",
+        "expiry_date": "",
+        "serials": "",
+        "notes": "",
+    }
+    if values:
+        form.update(values)
+    return render(
+        context,
+        "lab_movements.html",
+        status_code=status_code,
+        form=form,
+        items=items,
+        warehouses=warehouses,
+        movements=lab_stock.recent(),
+        error=error,
+        review=review,
+        saved=saved,
+        Direction=Direction,
+    )
 
 
-@router.get("/coming/{section}")
-def coming_soon(request: Request, section: str):
+@router.get("/lab-movements")
+def lab_movements(request: Request, direction: str = Direction.IN,
+                  saved: str = ""):
     context = resolve_user(request)
     blocked = require_login(context)
     if blocked is not None:
         return blocked
-    title, message = COMING.get(section, ("Not here yet", "This page is planned."))
-    return render(context, "coming_soon.html", title=title, message=message)
+    return _lab_page(context, direction=direction, saved=(saved or "").strip())
+
+
+def _lab_form_values(direction, item_code, warehouse_id, quantity, unit_cost,
+                     lot_number, expiry_date, serials, notes):
+    return {
+        "direction": direction,
+        "item_code": item_code,
+        "warehouse_id": warehouse_id,
+        "quantity": quantity,
+        "unit_cost": unit_cost,
+        "lot_number": lot_number,
+        "expiry_date": expiry_date,
+        "serials": serials,
+        "notes": notes,
+    }
+
+
+def _prepare_lab_form(context, values):
+    return lab_stock.prepare(
+        values["direction"],
+        values["item_code"],
+        values["warehouse_id"],
+        values["quantity"],
+        unit_cost=values["unit_cost"],
+        lot_number=values["lot_number"],
+        expiry_date=values["expiry_date"],
+        serials=values["serials"],
+        notes=values["notes"],
+        user=context.user,
+    )
+
+
+@router.post("/lab-movements/review")
+def lab_movement_review(
+    request: Request,
+    direction: str = Form(""),
+    item_code: str = Form(""),
+    warehouse_id: str = Form(""),
+    quantity: str = Form(""),
+    unit_cost: str = Form(""),
+    lot_number: str = Form(""),
+    expiry_date: str = Form(""),
+    serials: str = Form(""),
+    notes: str = Form(""),
+    csrf_token: str = Form(""),
+):
+    context = resolve_user(request)
+    blocked = require_login(context)
+    if blocked is not None:
+        return blocked
+    values = _lab_form_values(
+        direction, item_code, warehouse_id, quantity, unit_cost,
+        lot_number, expiry_date, serials, notes,
+    )
+    if not check_csrf(context, csrf_token):
+        return _lab_page(
+            context, values=values, error="The form expired. Try again.",
+            status_code=400,
+        )
+    try:
+        prepared = _prepare_lab_form(context, values)
+    except auth.NotAuthorised:
+        return forbidden(context, "record this stock movement")
+    except (lab_stock.LabStockError, inventory.StockError) as exc:
+        return _lab_page(context, values=values, error=str(exc), status_code=400)
+    return _lab_page(context, values=values, review=prepared)
+
+
+@router.post("/lab-movements/commit")
+def lab_movement_commit(
+    request: Request,
+    direction: str = Form(""),
+    item_code: str = Form(""),
+    warehouse_id: str = Form(""),
+    quantity: str = Form(""),
+    unit_cost: str = Form(""),
+    lot_number: str = Form(""),
+    expiry_date: str = Form(""),
+    serials: str = Form(""),
+    notes: str = Form(""),
+    csrf_token: str = Form(""),
+):
+    context = resolve_user(request)
+    blocked = require_login(context)
+    if blocked is not None:
+        return blocked
+    values = _lab_form_values(
+        direction, item_code, warehouse_id, quantity, unit_cost,
+        lot_number, expiry_date, serials, notes,
+    )
+    if not check_csrf(context, csrf_token):
+        return _lab_page(
+            context, values=values, error="The form expired. Try again.",
+            status_code=400,
+        )
+    try:
+        prepared = _prepare_lab_form(context, values)
+        doc_number, _ = lab_stock.commit(prepared)
+    except auth.NotAuthorised:
+        return forbidden(context, "record this stock movement")
+    except (lab_stock.LabStockError, inventory.StockError) as exc:
+        return _lab_page(context, values=values, error=str(exc), status_code=400)
+    return redirect(
+        context,
+        f"/lab-movements?direction={direction}&saved={doc_number}",
+    )
+
+
+# Keep old bookmarks useful now that every planned screen is live.
+_LIVE_SECTIONS = {
+    "shipping": "/shipping",
+    "receiving": "/receiving",
+    "logs": "/logs",
+    "analytics": "/analytics",
+    "settings": "/settings",
+}
+
+
+@router.get("/coming/{section}")
+def former_placeholder(request: Request, section: str):
+    context = resolve_user(request)
+    blocked = require_login(context)
+    if blocked is not None:
+        return blocked
+    return redirect(context, _LIVE_SECTIONS.get(section, "/"))

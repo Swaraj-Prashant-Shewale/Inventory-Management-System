@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% set active = 'receiving' if kind == 'supplier' else 'shipping' %}
+{% set singular = 'Supplier' if kind == 'supplier' else 'Customer' %}
+{% block title %}New {{ singular }}{% endblock %}
+{% block content %}
+<div class="screen-head"><div><h1 class="screen-title">NEW {{ singular|upper }}</h1><span class="muted">Create the partner, then continue the order</span></div><a class="btn" href="{{ '/receiving/orders/new' if kind == 'supplier' else '/shipping/orders/new' }}">Back</a></div>
+{% if error %}<p class="form-error" role="alert">{{ error }}</p>{% endif %}
+<form method="post" action="{{ '/receiving/suppliers/new' if kind == 'supplier' else '/shipping/customers/new' }}" class="master-form"><input type="hidden" name="csrf_token" value="{{ csrf }}"><section class="form-section"><div class="form-grid">
+  <label>Code<input name="code" value="{{ values.code|default('') }}" maxlength="30" required autofocus></label><label>Name<input name="name" value="{{ values.name|default('') }}" maxlength="160" required></label>
+  <label>GSTIN<input name="gstin" value="{{ values.gstin|default('') }}" maxlength="15"></label><label>GST state code<input name="state_code" value="{{ values.state_code|default('') }}" maxlength="2" inputmode="numeric" placeholder="27"></label>
+  <label>State<input name="state" value="{{ values.state|default('') }}" maxlength="100"></label><label>City<input name="city" value="{{ values.city|default('') }}" maxlength="100"></label>
+  <label>Contact person<input name="contact_person" value="{{ values.contact_person|default('') }}" maxlength="120"></label><label>Phone<input name="phone" value="{{ values.phone|default('') }}" maxlength="40"></label>
+  <label>Email<input type="email" name="email" value="{{ values.email|default('') }}" maxlength="120"></label><label class="wide-field">Address<textarea name="address" rows="3">{{ values.address|default('') }}</textarea></label>
+  </div></section><div class="form-actions"><a class="btn" href="{{ '/receiving/orders/new' if kind == 'supplier' else '/shipping/orders/new' }}">Cancel</a><button class="btn primary" type="submit">Create {{ singular }}</button></div></form>
+{% endblock %}

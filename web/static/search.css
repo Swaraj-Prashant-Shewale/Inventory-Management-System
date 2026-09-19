@@ -1,0 +1,71 @@
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+.global-search-form {
+  display: grid;
+  grid-template-columns: minmax(220px, 720px) auto;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+.global-search-form input {
+  min-width: 0;
+  padding: 10px 14px;
+  border: 2px solid var(--text);
+  border-radius: 8px;
+  background: var(--card);
+  color: var(--text);
+  font: inherit;
+}
+.global-search-form input:focus {
+  outline: 2px solid var(--teal);
+  outline-offset: 1px;
+}
+.search-results {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.result-kind {
+  display: inline-block;
+  min-width: 104px;
+  padding: 3px 7px;
+  border-radius: 4px;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  text-align: center;
+}
+.kind-item { background: #005F6B; }
+.kind-sales_order { background: #185ABC; }
+.kind-purchase_order { background: #9A5B00; }
+.kind-customer_return { background: #8B3A3A; }
+.kind-supplier_return { background: #6A4C1B; }
+.kind-customer { background: #087A55; }
+.kind-supplier { background: #7552A3; }
+.kind-employee { background: #5E6368; }
+.result-name { color: var(--teal); font-weight: 700; }
+.exact-result { background: #F2FAFB; }
+.exact-label {
+  display: inline-block;
+  margin-left: 8px;
+  color: #075B3D;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+.result-action { width: 70px; text-align: right; }
+.result-action a { color: var(--teal); font-weight: 600; }
+
+@media (max-width: 700px) {
+  .global-search-form { grid-template-columns: minmax(0, 1fr) auto; }
+  .result-kind { min-width: 86px; }
+}

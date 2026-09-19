@@ -1,0 +1,81 @@
+.metric-strip {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(140px, 1fr));
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  margin-bottom: 16px;
+  overflow: hidden;
+}
+.metric-strip > div {
+  min-width: 0;
+  padding: 14px 16px;
+  border-right: 1px solid var(--border);
+}
+.metric-strip > div:last-child { border-right: 0; }
+.metric-strip strong {
+  display: block;
+  margin: 4px 0;
+  font-size: 20px;
+  overflow-wrap: anywhere;
+}
+.metric-strip small { display: block; color: var(--muted); }
+.metric-label {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+.positive { color: #087A55 !important; }
+.negative { color: #A33A35 !important; }
+
+.analytics-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+.analytics-panel {
+  min-width: 0;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.analytics-panel .section-head { padding: 16px 18px 8px; }
+.analytics-panel h2 { margin: 0; font-size: 17px; }
+.wide-panel { grid-column: 1 / -1; }
+.ranking-list {
+  list-style-position: inside;
+  margin: 0;
+  padding: 0 18px 12px;
+}
+.ranking-list li {
+  display: grid;
+  grid-template-columns: minmax(130px, 1fr) minmax(80px, 1fr) minmax(80px, auto);
+  gap: 12px;
+  align-items: center;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--row-line);
+}
+.ranking-list li:last-child { border-bottom: 0; }
+.ranking-list li div span { display: block; }
+.ranking-list meter { width: 100%; height: 12px; }
+.empty-ranking { display: block !important; color: var(--muted); }
+
+@media (max-width: 1050px) {
+  .metric-strip { grid-template-columns: repeat(3, minmax(140px, 1fr)); }
+  .metric-strip > div:nth-child(3) { border-right: 0; }
+  .metric-strip > div:nth-child(-n+3) { border-bottom: 1px solid var(--border); }
+}
+@media (max-width: 700px) {
+  .metric-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .metric-strip > div { border-bottom: 1px solid var(--border); }
+  .metric-strip > div:nth-child(odd) { border-right: 1px solid var(--border); }
+  .metric-strip > div:nth-child(even) { border-right: 0; }
+  .metric-strip > div:nth-last-child(-n+2) { border-bottom: 0; }
+  .analytics-grid { grid-template-columns: 1fr; }
+  .wide-panel { grid-column: auto; }
+  .ranking-list li { grid-template-columns: minmax(110px, 1fr) minmax(70px, 1fr); }
+  .ranking-list li > .num { grid-column: 2; }
+}

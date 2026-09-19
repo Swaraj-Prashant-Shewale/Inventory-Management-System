@@ -19,15 +19,14 @@ the security posture.
   structural, not per-query discipline. Proven by test: two live tenants, one login
   page, zero data bleed.
 - **Provisioning** is operator-only: `manage_platform.py create-tenant acme "Acme
-  Traders"` (or the /admin panel when ADMIN_DB_* env vars are set on the server). The
+  Traders"` (or the /admin panel when the limited PROVISION_DB_* credentials are set). The
   app role cannot create schemas at all.
 - **Sessions** are signed httponly cookies with a sliding idle window; CSRF tokens ride
   inside the signed payload; the same PBKDF2/lockout/forced-change auth as the desktop.
 - **Responsive** — usable from phones and tablets; wide tables scroll inside their card.
 - On SQLite the web app runs single-tenant for local development.
 
-Web status: **W1 complete** (tenancy, auth, shell, Home, Inventory read view, admin
-panel). W2 ports the transactional screens; W3 analytics, documents and deployment.
+Web status: **W3 complete**. The W1 platform foundation and all W2 operational workflows are live: Check In / Out, item create/edit, Recent Logs, warehouses, employees, user access, purchasing and receiving, sales and shipping, stock adjustments, warehouse transfers, and cycle counts. W3 Analytics, PDF document downloads, barcode-label printing, and global search are also live. Post-W3 web parity work has begun with partial/full payment recording and payment history on sales orders.
 
 ## Desktop application (being retired once the web is live)
 
@@ -44,9 +43,9 @@ warehouse. After that you get a normal sign-in screen.
 
 ## Database
 
-Live on Supabase (project `rsoevmbycvvmnmqyztbt`, region `ap-southeast-2`,
+Live on Supabase (project `<your-project-ref>`, region `<your-region>`,
 PostgreSQL 17.6). The schema — 41 tables, 98 foreign keys, 176 indexes — is created and
-seeded.
+seeded. (The real project ref and region live only in your local `.env`, not in this repo.)
 
 One switch in `.env` picks the backend:
 
@@ -60,8 +59,8 @@ DB_BACKEND=sqlite     # a local file, for experimenting without touching live da
 **Connect through the session pooler, not the direct host.**
 `db.<ref>.supabase.co` resolves to an IPv6 address only. Networks without IPv6 — which
 is most of them — cannot reach it at all. Use
-`aws-0-ap-southeast-2.pooler.supabase.com:5432` with the username
-`postgres.<project-ref>`. (Only the `aws-0` cluster serves this project; `aws-1` returns
+`aws-0-<region>.pooler.supabase.com:5432` with the username
+`postgres.<project-ref>`. (Only the `aws-0` cluster serves the project; `aws-1` returns
 "tenant not found".)
 
 **Never pass `options` in the connection parameters.** Supabase's Supavisor pooler reads
@@ -85,9 +84,10 @@ Round trip to Sydney is roughly 140 ms, so query *count* dominates everything:
 ## Row Level Security
 
 RLS is enabled on all 41 tables by the project's automatic-RLS trigger. The application
-connects as `postgres`, which holds `bypassrls`, so it is unaffected. **If you move the
-app to a restricted role, that role needs `BYPASSRLS` or explicit policies** — otherwise
-every screen silently reads zero rows.
+connects as the least-privilege `inventory_app` role, which is granted `BYPASSRLS` — the
+grants (not RLS) are what bound what the app can do. **A restricted role without
+`BYPASSRLS` or explicit policies would silently read zero rows on every screen**, so keep
+that grant if you ever rebuild the role.
 
 ## Layout
 
@@ -176,6 +176,9 @@ if you suspect a breach. In short:
 - TLS is **verify-full** against `certs/supabase-ca.crt`, so the server is authenticated
   and not merely encrypted.
 - Roles are enforced in the service layer, not just by disabling buttons.
+- The web sign-in and `/admin` panel are **rate limited per client IP** (429 before any
+  PBKDF2 work), and the `/admin` panel supports **TOTP two-factor**
+  (`manage_platform.py admin-2fa`).
 
 ## Packaging
 
@@ -190,11 +193,13 @@ antivirus and occasionally trips a false positive.
 
 ## Tests
 
-Eight suites in the session scratchpad, roughly 400 assertions: the stock engine and
-costing, the Phase 1 UI, Phase 2 services and dialogs, analytics, the workforce and Home
-screen, document generation, and global search. Each builds its own throwaway SQLite
-database. `smoke1` and `smoke3` also run against PostgreSQL via `verify_pg.py`, which
-creates and drops its own scratch schema so live data is never touched.
+Sixteen suites in the session scratchpad: the stock engine and costing, the Phase 1 UI,
+Phase 2 services and dialogs, analytics, the workforce and Home screen, document
+generation, global search, the web app (auth, CSRF, login rate-limiting, TOTP), and the
+live multi-tenant proofs. Each SQLite suite builds its own throwaway database. Four run
+against the live PostgreSQL — the restricted-role business cycle, multi-tenant isolation
+(with admin 2FA), an adversarial cross-tenant attack suite, and a concurrency proof — each
+inside a throwaway scratch schema created and dropped so live data is never touched.
 
 Two habits worth keeping:
 

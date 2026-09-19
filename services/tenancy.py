@@ -88,6 +88,10 @@ class PlatformAdmin(_RegistryModel):
     failed_attempts = IntegerField(default=0)
     locked_until = DateTimeField(null=True)
     last_login_at = DateTimeField(null=True)
+    # Base32 TOTP secret when two-factor is enabled; NULL means password-only. Written
+    # only by the operator CLI (manage_platform.py admin-2fa) on administrator
+    # credentials — the app role can read it but never set it.
+    totp_secret = CharField(max_length=64, null=True)
     created_at = DateTimeField(default=datetime.datetime.now)
 
 
@@ -274,8 +278,12 @@ def ensure_registry(admin_connection):
             failed_attempts INTEGER NOT NULL DEFAULT 0,
             locked_until TIMESTAMP,
             last_login_at TIMESTAMP,
+            totp_secret VARCHAR(64),
             created_at TIMESTAMP NOT NULL DEFAULT NOW()
         )""")
+    # Backfill the 2FA column on registries created before it existed. Idempotent.
+    cursor.execute("ALTER TABLE public.platform_admin "
+                   "ADD COLUMN IF NOT EXISTS totp_secret VARCHAR(64)")
     for statement in (
         # The registry (which username -> which schema) is admin-owned and read-only to
         # the app. The app only ever reads public.tenant; all writes go through the admin
@@ -297,10 +305,11 @@ def ensure_registry(admin_connection):
 def provision_tenant(admin_connection, admin_password, slug, display_name,
                      owner_username, owner_full_name, owner_password=None,
                      notes=None, warehouse_name="Main Warehouse",
-                     warehouse_code="WH1", state_code=None):
+                     warehouse_code="WH1", state_code=None,
+                     ensure_registry_first=True):
     """Create a client: schema, tables, seed data, first warehouse, grants, first Owner.
 
-    Runs entirely on administrator credentials — the app role cannot create schemas,
+    Runs on a provisioning credential — the app role cannot create schemas,
     which is the point. Returns (tenant_row_id, schema, owner_username, temp_password).
     The Owner is created with must_change_password set: the operator knows the temporary
     password, so the first sign-in forces a private one.
@@ -319,7 +328,8 @@ def provision_tenant(admin_connection, admin_password, slug, display_name,
         raise TenancyError("Owner username is required and cannot contain spaces.")
 
     cursor = admin_connection.cursor()
-    ensure_registry(admin_connection)
+    if ensure_registry_first:
+        ensure_registry(admin_connection)
 
     cursor.execute("SELECT 1 FROM public.tenant WHERE slug = %s OR schema_name = %s",
                    (slug, schema))
@@ -430,3 +440,73 @@ def drop_tenant(admin_connection, slug, *, confirm_slug):
     cursor.execute("DELETE FROM public.tenant WHERE slug = %s", (slug,))
     cursor.execute(f'DROP SCHEMA IF EXISTS "{schema}" CASCADE')
     log.warning("Dropped tenant %s (schema %s)", slug, schema)
+
+
+def set_tenant_active(admin_connection, slug, active: bool) -> str:
+    """Suspend (active=False) or reactivate (active=True) a client without deleting data.
+
+    A suspended tenant is refused at login (find_tenant_for_username and get_tenant both
+    check is_active) and any live session is dropped on its next request, but the schema
+    and every row are left untouched — reactivating restores full access. This is the
+    non-payment lever: block access, keep the data. Returns the display name.
+    """
+    slug = valid_slug(slug)
+    cursor = admin_connection.cursor()
+    cursor.execute(
+        "UPDATE public.tenant SET is_active = %s WHERE slug = %s RETURNING display_name",
+        (active, slug))
+    row = cursor.fetchone()
+    if not row:
+        raise TenancyError(f"No client with the slug '{slug}'.")
+    log.warning("Tenant %s set is_active=%s", slug, active)
+    return row[0]
+
+
+def reset_owner_password(admin_connection, admin_password, slug, username=None):
+    """Reset a tenant user's password to a fresh temporary one (operator recovery).
+
+    Runs on administrator credentials against the client's own schema — the operator never
+    learns the user's real password, only issues a new temporary one that the user is
+    forced to replace at next sign-in. Defaults to the client's Owner when no username is
+    given. Returns (username, temporary_password).
+    """
+    from database.connection import SchemaPostgresqlDatabase
+    from database.models import ALL_MODELS, Role, User
+    from services import auth
+
+    slug = valid_slug(slug)
+    schema = SCHEMA_PREFIX + slug
+    cursor = admin_connection.cursor()
+    cursor.execute("SELECT 1 FROM public.tenant WHERE slug = %s", (slug,))
+    if not cursor.fetchone():
+        raise TenancyError(f"No client with the slug '{slug}'.")
+
+    params = admin_connection.get_dsn_parameters()
+    tenant_db = SchemaPostgresqlDatabase(
+        params.get("dbname", "postgres"), schema=schema,
+        user=params.get("user"), password=admin_password,
+        host=params.get("host"), port=int(params.get("port", 5432)),
+        sslmode=config.PG_SSLMODE,
+        **({"sslrootcert": config.PG_SSLROOTCERT} if config.PG_HAS_ROOTCERT else {}))
+    try:
+        with tenant_db.bind_ctx(ALL_MODELS):
+            tenant_db.connect()
+            if username:
+                user = User.get_or_none(User.username == username.strip())
+                who = f"user '{username}'"
+            else:
+                user = User.get_or_none(User.role == Role.OWNER)
+                who = "the owner"
+            if user is None:
+                raise TenancyError(f"Could not find {who} in client '{slug}'.")
+            password = temp_password()
+            user.password_hash = auth.hash_password(password)
+            user.must_change_password = True
+            user.failed_attempts = 0
+            user.locked_until = None
+            user.save()
+            log.warning("Reset password for '%s' in tenant %s", user.username, slug)
+            return user.username, password
+    finally:
+        if not tenant_db.is_closed():
+            tenant_db.close()

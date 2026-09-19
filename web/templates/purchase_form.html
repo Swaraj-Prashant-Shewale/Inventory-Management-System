@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% set active = 'receiving' %}
+{% block title %}New Purchase Order{% endblock %}
+{% block content %}
+<div class="screen-head"><div><h1 class="screen-title">NEW PURCHASE ORDER</h1><span class="muted">Order stock from a supplier</span></div><a class="btn" href="/receiving">Back</a></div>
+{% if error %}<p class="form-error" role="alert">{{ error }}</p>{% endif %}
+<form method="post" action="/receiving/orders" class="master-form">
+  <input type="hidden" name="csrf_token" value="{{ csrf }}">
+  <section class="form-section"><div class="section-head"><h2>Order details</h2>{% if can(auth.PERM_MANAGE_PARTNERS) %}<a href="/receiving/suppliers/new">New supplier</a>{% endif %}</div>
+    <div class="form-grid">
+      <label>Supplier<select name="supplier_id" required><option value="">Choose supplier</option>{% for supplier in suppliers %}<option value="{{ supplier.id }}" {{ 'selected' if values.supplier_id|string == supplier.id|string else '' }}>{{ supplier.name }} ({{ supplier.code }})</option>{% endfor %}</select></label>
+      <label>Deliver to<select name="warehouse_id" required><option value="">Choose warehouse</option>{% for warehouse in warehouses %}<option value="{{ warehouse.id }}" {{ 'selected' if values.warehouse_id|string == warehouse.id|string else '' }}>{{ warehouse.name }}</option>{% endfor %}</select></label>
+      <label>Expected date<input type="date" name="expected_date" value="{{ values.expected_date }}"></label>
+      <label class="wide-field">Notes<textarea name="notes" rows="2" maxlength="500">{{ values.notes }}</textarea></label>
+    </div>
+  </section>
+  <section class="order-lines"><div class="section-head"><h2>Items</h2><span class="muted small">Up to five lines per order</span></div>
+    <div class="table-scroll"><table><thead><tr><th>#</th><th>Item</th><th>Quantity</th><th>Unit cost</th></tr></thead><tbody>
+      {% for line in lines %}<tr><td>{{ loop.index }}</td><td><select name="item_id"><option value="">Choose item</option>{% for item in items %}<option value="{{ item.id }}" {{ 'selected' if line.item_id|string == item.id|string else '' }}>{{ item.sku }} &middot; {{ item.name }}</option>{% endfor %}</select></td><td><input type="number" name="quantity" value="{{ line.quantity }}" min="0.001" step="0.001"></td><td><input type="number" name="price" value="{{ line.price }}" min="0" step="0.01" placeholder="Use last cost"></td></tr>{% endfor %}
+    </tbody></table></div>
+  </section>
+  <div class="form-actions"><a class="btn" href="/receiving">Cancel</a><button class="btn primary" type="submit">Create Draft Order</button></div>
+</form>
+{% endblock %}

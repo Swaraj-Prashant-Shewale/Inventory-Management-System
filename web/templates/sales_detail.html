@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% set active = 'shipping' %}
+{% block title %}{{ order.number }}{% endblock %}
+{% block content %}
+<div class="screen-head"><div><h1 class="screen-title">{{ order.number }}</h1><span class="muted">{{ order.customer.name }} &middot; {{ order.warehouse.name }}</span></div><a class="btn" href="/shipping">All Sales Orders</a></div>
+{% if saved %}<div class="status-banner success" role="status">Completed <strong>{{ saved }}</strong>.</div>{% endif %}{% if error %}<p class="form-error" role="alert">{{ error }}</p>{% endif %}
+<section class="order-summary"><dl><div><dt>Status</dt><dd>{{ SalesStatus.LABELS.get(order.status, order.status) }}</dd></div><div><dt>Payment</dt><dd>{{ order.payment_status|title }}</dd></div><div><dt>Order date</dt><dd>{{ order.order_date.strftime("%d %b %Y") }}</dd></div><div><dt>Promised</dt><dd>{{ order.promised_date.strftime("%d %b %Y") if order.promised_date else "-" }}</dd></div><div><dt>Total</dt><dd>&#8377;{{ "{:,.2f}".format(order.total or 0) }}</dd></div><div><dt>Balance due</dt><dd>&#8377;{{ "{:,.2f}".format(order.balance_due or 0) }}</dd></div></dl></section>
+<section class="order-lines"><div class="table-scroll"><table><thead><tr><th>Item</th><th class="num">Ordered</th><th class="num">Shipped</th><th class="num">Outstanding</th><th class="num">Unit price</th><th class="num">Discount</th><th class="num">Line total</th></tr></thead><tbody>{% for line in lines %}<tr><td><span class="strong">{{ line.item.name }}</span><br><span class="muted small">{{ line.item.sku }}</span></td><td class="num">{{ "{:g}".format(line.quantity) }}</td><td class="num">{{ "{:g}".format(line.shipped_quantity) }}</td><td class="num">{{ "{:g}".format(line.outstanding) }}</td><td class="num">&#8377;{{ "{:,.2f}".format(line.unit_price) }}</td><td class="num">{{ "{:g}".format(line.discount_percent) }}%</td><td class="num">&#8377;{{ "{:,.2f}".format(line.line_total) }}</td></tr>{% endfor %}</tbody></table></div></section>
+<div class="form-actions">
+  {% if order.status == SalesStatus.DRAFT and can(auth.PERM_CREATE_SALES) %}<form method="post" action="/shipping/{{ order.id }}/confirm" class="inline"><input type="hidden" name="csrf_token" value="{{ csrf }}"><button class="btn primary" type="submit">Confirm and Reserve</button></form>{% endif %}
+  {% if order.status in (SalesStatus.CONFIRMED, SalesStatus.PARTIAL) and can(auth.PERM_FULFILL_GOODS) %}<a class="btn primary" href="/shipping/{{ order.id }}/fulfill">Ship Goods</a>{% endif %}
+  {% if order.status != SalesStatus.CANCELLED and order.balance_due > 0 and can(auth.PERM_RECORD_PAYMENT) %}<a class="btn" href="/shipping/{{ order.id }}/payments/new">Record Payment</a>{% endif %}
+  {% if order.status in (SalesStatus.PARTIAL, SalesStatus.SHIPPED) and can(auth.PERM_CREATE_SALES) %}<a class="btn" href="/operations/returns/customer/new?order={{ order.id }}">Customer Return</a>{% endif %}
+</div>
+{% if payments %}
+<section class="payment-history" aria-labelledby="payment-history-title">
+  <h2 id="payment-history-title">Payment History</h2>
+  <div class="card table-card"><div class="table-scroll"><table>
+    <thead><tr><th>Payment</th><th>Date</th><th>Method</th><th>Reference</th><th>Recorded by</th><th class="num">Amount</th></tr></thead>
+    <tbody>{% for payment in payments %}<tr><td class="strong">{{ payment.number }}</td><td>{{ payment.payment_date.strftime("%d %b %Y") }}</td><td>{{ payment.method|title }}</td><td>{{ payment.reference or "-" }}</td><td>{{ payment.recorded_by.full_name if payment.recorded_by else "-" }}</td><td class="num">&#8377;{{ "{:,.2f}".format(payment.amount) }}</td></tr>{% endfor %}</tbody>
+  </table></div></div>
+</section>
+{% endif %}
+<section class="document-panel" aria-labelledby="sales-documents-title">
+  <h2 id="sales-documents-title">Documents</h2>
+  <div class="document-list">
+    {% if order.status != SalesStatus.DRAFT and can(auth.PERM_CREATE_SALES) and not invoices %}
+    <form method="post" action="/shipping/{{ order.id }}/invoice" class="inline">
+      <input type="hidden" name="csrf_token" value="{{ csrf }}">
+      <button class="btn" type="submit">Raise Tax Invoice</button>
+    </form>
+    {% endif %}
+    {% for invoice in invoices %}
+    <a class="btn" href="/documents/invoices/{{ invoice.id }}.pdf">Download Invoice {{ invoice.number }}</a>
+    {% endfor %}
+    {% for fulfillment in fulfillments %}
+    <a class="btn" href="/documents/delivery-challans/{{ fulfillment.id }}.pdf">Download Challan {{ fulfillment.number }}</a>
+    {% endfor %}
+    {% if order.status == SalesStatus.DRAFT %}
+    <span class="muted small">Confirm the order before raising its invoice.</span>
+    {% endif %}
+  </div>
+</section>
+{% if order.notes %}<section class="plain-notes"><h2>Notes</h2><p>{{ order.notes }}</p></section>{% endif %}
+{% endblock %}

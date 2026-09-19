@@ -23,8 +23,11 @@ The application runs as **`inventory_app`**, a least-privilege role created by
 Verified from the role's own session, not assumed — `security_setup.py` reconnects as
 `inventory_app` and proves each restriction before printing the credentials.
 
-**The `postgres` superuser password must never be deployed to a warehouse PC.** It is
-needed only for schema migrations and for re-running `security_setup.py`. Keep it in a
+**The `postgres` superuser password must never be deployed to a warehouse PC or web
+host.** Web client creation uses a separate `inventory_provisioner` role with only
+schema-creation and registry-row privileges. It cannot administer platform accounts.
+The Supabase owner is needed only for schema migrations, provisioner setup, and
+re-running `security_setup.py`. Keep it in a
 password manager, not in any `.env` that ships.
 
 ### Why the ledgers are frozen
@@ -53,6 +56,20 @@ the Data API is ever switched on.
   temporary one; the next sign-in forces a change and refusing it blocks entry.
 - **Idle lock** after `SESSION_IDLE_MINUTES` (default 20). Re-enter the password to
   resume; failing ends the session. Warehouse terminals are shared and get abandoned.
+- **No user enumeration.** A non-existent username spends the same PBKDF2 time as a real
+  wrong password and returns the identical message, so the login form cannot be used to
+  discover which accounts (or tenants) exist.
+- **Web login throttling.** The web sign-in and the operator `/admin` sign-in are rate
+  limited per client IP (20 and 10 attempts per 5 minutes), answering `429` *before*
+  spending any PBKDF2 time once over the limit. This blunts both password spraying and the
+  CPU-exhaustion an unmetered PBKDF2 login otherwise invites (each attempt is ~0.5 s of
+  hashing). A successful sign-in clears the counter, so a shared office IP is not
+  penalised.
+- **Two-factor on the operator panel.** A platform admin can enable TOTP (RFC 6238,
+  standard-library — works with any authenticator app) with
+  `manage_platform.py admin-2fa --username <name>`. `/admin` then requires the 6-digit code
+  as well as the password, and a wrong code counts toward the same lockout, so the
+  six-digit space cannot be brute-forced.
 
 ## Transport
 
@@ -126,6 +143,18 @@ anywhere else. It needs the IPs, which is why it is not done.
 **No backups configured.** Ransomware and a careless `DELETE` look the same afterwards.
 Supabase's automatic backups depend on your plan — check what retention you actually
 have before going live.
+
+**Admin 2FA codes are not single-use.** A TOTP code stays valid for its ~90-second window
+and is not marked consumed, so a code captured and replayed within that window would be
+accepted. The practical risk is small — an attacker would also need the admin password, and
+the whole login POST is equally replayable — but true single-use would need a
+last-used-step column on `platform_admin`. The rate limiter and per-IP throttle bound how
+fast codes can be tried regardless.
+
+**Rate-limit keying trusts one reverse proxy.** The login throttle keys on the client IP
+taken as the last (proxy-appended) `X-Forwarded-For` hop, assuming exactly one trusted
+proxy in front of the app. If you add a second (e.g. Cloudflare in front of the host), set
+`WEB_TRUSTED_PROXY_HOPS=2` so the real client IP is still used and cannot be spoofed.
 
 ## If you suspect a compromise
 

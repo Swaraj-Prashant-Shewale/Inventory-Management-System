@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% set active = 'shipping' %}
+{% block title %}Record Payment{% endblock %}
+{% block content %}
+<div class="screen-head">
+  <div>
+    <h1 class="screen-title">RECORD PAYMENT</h1>
+    <span class="muted">{{ order.number }} &middot; {{ order.customer.name }}</span>
+  </div>
+  <a class="btn" href="/shipping/{{ order.id }}">Back to Order</a>
+</div>
+
+{% if error %}<p class="form-error" role="alert">{{ error }}</p>{% endif %}
+
+<section class="payment-summary" aria-label="Order balance">
+  <dl>
+    <div><dt>Order total</dt><dd>&#8377;{{ "{:,.2f}".format(order.total or 0) }}</dd></div>
+    <div><dt>Already paid</dt><dd>&#8377;{{ "{:,.2f}".format(order.amount_paid or 0) }}</dd></div>
+    <div><dt>Outstanding</dt><dd>&#8377;{{ "{:,.2f}".format(order.balance_due or 0) }}</dd></div>
+  </dl>
+</section>
+
+<form method="post" action="/shipping/{{ order.id }}/payments" class="master-form payment-form">
+  <input type="hidden" name="csrf_token" value="{{ csrf }}">
+  <section class="form-section">
+    <div class="form-grid">
+      <label>Amount
+        <input type="number" name="amount" value="{{ values.amount }}" min="0.01" step="0.01" required autofocus>
+      </label>
+      <label>Method
+        <select name="method" required>
+          {% for method in methods %}<option value="{{ method }}" {{ 'selected' if values.method == method else '' }}>{{ method|title }}</option>{% endfor %}
+        </select>
+      </label>
+      <label>Reference
+        <input name="reference" value="{{ values.reference }}" maxlength="80" autocomplete="off">
+      </label>
+      <label>Payment date
+        <input type="date" name="payment_date" value="{{ values.payment_date }}" required>
+      </label>
+      <label class="wide-field">Notes
+        <input name="notes" value="{{ values.notes }}" maxlength="200">
+      </label>
+    </div>
+    <label class="check overpayment-check"><input type="checkbox" name="allow_overpayment" value="1" {{ 'checked' if values.allow_overpayment else '' }}> Allow payment above the outstanding balance</label>
+  </section>
+  <div class="form-actions">
+    <a class="btn" href="/shipping/{{ order.id }}">Cancel</a>
+    <button class="btn primary" type="submit">Record Payment</button>
+  </div>
+</form>
+{% endblock %}

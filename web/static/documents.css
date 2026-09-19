@@ -1,0 +1,32 @@
+.document-panel {
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+.document-panel h2 {
+  margin: 0 0 10px;
+  font-size: 17px;
+}
+.document-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+.label-form { min-width: 0; }
+.label-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px;
+  align-items: end;
+  margin-bottom: 14px;
+}
+.label-options > label:first-child { width: 150px; }
+.select-col {
+  width: 64px;
+  text-align: center;
+}
+.select-col input {
+  width: 18px;
+  height: 18px;
+}

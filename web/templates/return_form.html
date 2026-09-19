@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% set active = 'operations' %}
+{% set customer_return = kind == 'customer' %}
+{% block title %}New {{ 'Customer' if customer_return else 'Supplier' }} Return{% endblock %}
+{% block content %}
+<div class="screen-head"><div><h1 class="screen-title">NEW {{ 'CUSTOMER' if customer_return else 'SUPPLIER' }} RETURN</h1></div><a class="btn" href="/operations/returns?kind={{ kind }}">Back to Returns</a></div>
+{% if error %}<p class="form-error" role="alert">{{ error }}</p>{% endif %}
+<form method="post" class="master-form" action="/operations/returns/{{ kind }}">
+  <input type="hidden" name="csrf_token" value="{{ csrf }}">
+  <section class="form-section"><div class="section-head"><h2>Return details</h2></div><div class="form-grid">
+    <label>{{ 'Customer' if customer_return else 'Supplier' }}<select name="{{ 'customer_id' if customer_return else 'partner_id' }}" required><option value="">Choose {{ 'customer' if customer_return else 'supplier' }}</option>{% for partner in partners %}<option value="{{ partner.id }}" {{ 'selected' if (values.customer_id if customer_return else values.partner_id)|string == partner.id|string else '' }}>{{ partner.code }} &middot; {{ partner.name }}</option>{% endfor %}</select></label>
+    <label>Warehouse<select name="warehouse_id" required><option value="">Choose warehouse</option>{% for warehouse in warehouses %}<option value="{{ warehouse.id }}" {{ 'selected' if values.warehouse_id|string == warehouse.id|string else '' }}>{{ warehouse.code }} &middot; {{ warehouse.name }}</option>{% endfor %}</select></label>
+    <label>Related {{ 'sales' if customer_return else 'purchase' }} order<select name="order_id"><option value="">No linked order</option>{% for order in orders %}<option value="{{ order.id }}" {{ 'selected' if values.order_id|string == order.id|string else '' }}>{{ order.number }} &middot; {{ order.customer.name if customer_return else order.supplier.name }}</option>{% endfor %}</select></label>
+    <label>Reason<input name="reason" value="{{ values.reason }}" maxlength="200" required></label>
+    {% if customer_return %}<fieldset class="wide-field disposition-control"><legend>Disposition</legend><label><input type="radio" name="disposition" value="restock" {{ 'checked' if values.disposition != 'scrap' else '' }}><span>Return to Stock</span></label><label><input type="radio" name="disposition" value="scrap" {{ 'checked' if values.disposition == 'scrap' else '' }}><span>Scrap</span></label></fieldset>{% endif %}
+    <label class="wide-field">Notes<textarea name="notes" rows="2" maxlength="1000">{{ values.notes }}</textarea></label>
+  </div></section>
+  <section class="order-lines"><div class="section-head"><h2>Items</h2><span class="muted small">Serial-tracked items need one serial number per returned unit</span></div><div class="table-scroll"><table><thead><tr><th>#</th><th>Item</th><th>Quantity</th><th>{{ 'Return price' if customer_return else 'Unit cost' }}</th><th>Serial numbers</th></tr></thead><tbody>
+    {% for line in lines %}<tr><td>{{ loop.index }}</td><td><select name="item_id"><option value="">Choose item</option>{% for item in items %}<option value="{{ item.id }}" {{ 'selected' if line.item_id|string == item.id|string else '' }}>{{ item.sku }} &middot; {{ item.name }}{{ ' (serial)' if item.is_serial_tracked else '' }}</option>{% endfor %}</select></td><td><input type="number" name="quantity" value="{{ line.quantity }}" min="0.001" step="0.001"></td><td><input type="number" name="value" value="{{ line.value }}" min="0" step="0.01"></td><td><textarea name="serials" rows="2" placeholder="One per line or comma separated">{{ line.serials }}</textarea></td></tr>{% endfor %}
+  </tbody></table></div></section>
+  <div class="form-actions"><a class="btn" href="/operations/returns?kind={{ kind }}">Cancel</a><button class="btn primary" type="submit">Record {{ 'Customer' if customer_return else 'Supplier' }} Return</button></div>
+</form>
+{% endblock %}

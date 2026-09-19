@@ -1,19 +1,34 @@
-# Secrets — never commit
+# Secrets - never commit
 .env
+.env.*
+!.env.example
 web_secret.key
 *.key
+*.pem
+*.pfx
+*.p12
+*.jks
+*.keystore
+.npmrc
+.pypirc
+credentials*.json
+service-account*.json
 
-# Personal notes — keep local
+# Personal notes - keep local
 HOW_TO_UPLOAD_TO_GITHUB.txt
 
-# Local databases
+# Local databases and backups
 *.db
 *.db-wal
 *.db-shm
+*.sqlite
 *.sqlite3
+*.dump
+*.backup
+backups/
 
 # Logs and generated documents
-app.log
+*.log
 documents/
 
 # Python
@@ -22,10 +37,18 @@ __pycache__/
 .venv/
 venv/
 
-# PyInstaller
+# PyInstaller and release artifacts (publish binaries as GitHub Release assets)
 build/
 dist/
 *.spec
+release/
+releases/
+*.exe
+*.msi
+*.zip
+*.7z
+*.tar
+*.tar.gz
 
 # Editors / OS
 .vscode/
@@ -34,5 +57,7 @@ Thumbs.db
 desktop.ini
 
 # The Supabase CA is a public certificate, not a secret, and every warehouse PC needs
-# it — so it is committed and shipped deliberately.
+# it - so it is committed and shipped deliberately.
 !certs/supabase-ca.crt
+
+.vercel/

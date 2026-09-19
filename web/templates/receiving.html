@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% set active = 'receiving' %}
+{% block title %}Receiving{% endblock %}
+{% block content %}
+<div class="screen-head">
+  <div><h1 class="screen-title">RECEIVING</h1><span class="muted">Purchase orders and incoming goods</span></div>
+  {% if can(auth.PERM_CREATE_PURCHASE) %}<a class="btn primary" href="/receiving/orders/new">New Purchase Order</a>{% endif %}
+</div>
+{% if saved %}<div class="status-banner success" role="status">Completed <strong>{{ saved }}</strong>.</div>{% endif %}
+<form class="filter-row" method="get" action="/receiving">
+  <input type="search" name="q" value="{{ q }}" placeholder="Order number or supplier">
+  <select name="status"><option value="">All statuses</option>{% for value, label in PurchaseStatus.LABELS.items() %}<option value="{{ value }}" {{ 'selected' if status == value else '' }}>{{ label }}</option>{% endfor %}</select>
+  <button class="btn" type="submit">Apply</button><a class="btn quiet" href="/receiving">Clear</a>
+</form>
+<section class="order-table">
+  <div class="table-scroll"><table>
+    <thead><tr><th>Order</th><th>Supplier</th><th>Warehouse</th><th>Ordered</th><th>Expected</th><th>Status</th><th class="num">Total</th><th>Action</th></tr></thead>
+    <tbody>{% for order in orders %}<tr>
+      <td class="strong"><a href="/receiving/{{ order.id }}">{{ order.number }}</a></td><td>{{ order.supplier.name }}</td><td>{{ order.warehouse.name }}</td>
+      <td class="nowrap">{{ order.order_date.strftime("%d %b %Y") }}</td><td class="nowrap">{{ order.expected_date.strftime("%d %b %Y") if order.expected_date else "-" }}</td>
+      <td><span class="status-tag">{{ PurchaseStatus.LABELS.get(order.status, order.status) }}</span></td><td class="num">&#8377;{{ "{:,.2f}".format(order.total or 0) }}</td>
+      <td><a href="/receiving/{{ order.id }}">Open</a></td>
+    </tr>{% else %}<tr><td colspan="8" class="empty">No purchase orders match these filters.</td></tr>{% endfor %}</tbody>
+  </table></div>
+</section>
+{% endblock %}

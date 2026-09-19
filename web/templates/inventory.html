@@ -3,15 +3,23 @@
 {% block title %}Inventory{% endblock %}
 {% block content %}
 <div class="screen-head">
-  <h1 class="screen-title">INVENTORY</h1>
-  <span class="muted">{{ rows|length }} item(s)
-    {% if low_count %} · {{ low_count }} below minimum{% endif %}
-    {% if show_cost %} · stock value ₹{{ "{:,.2f}".format(total_value) }}{% endif %}
-  </span>
+  <div>
+    <h1 class="screen-title">INVENTORY</h1>
+    <span class="muted">{{ rows|length }} item(s)
+      {% if low_count %} &middot; {{ low_count }} below minimum{% endif %}
+      {% if show_cost %} &middot; stock value &#8377;{{ "{:,.2f}".format(total_value) }}{% endif %}
+    </span>
+  </div>
+  <div class="document-list">
+    <a href="/documents/labels" class="btn">Print Labels</a>
+    {% if can(auth.PERM_MANAGE_ITEMS) %}<a href="/inventory/new" class="btn primary">New Item</a>{% endif %}
+  </div>
 </div>
 
+{% if saved %}<div class="status-banner success" role="status">Saved item <strong>{{ saved }}</strong>.</div>{% endif %}
+
 <form method="get" action="/inventory" class="filter-row">
-  <input type="search" name="q" placeholder="Search name, SKU or barcode…" value="{{ q }}">
+  <input type="search" name="q" placeholder="Search name, SKU or barcode" value="{{ q }}">
   <select name="warehouse">
     <option value="0">All warehouses</option>
     {% for w in warehouses %}
@@ -29,14 +37,11 @@
     <table>
       <thead>
         <tr>
-          <th>Product</th>
-          <th>SKU</th>
-          <th class="num">On Hand</th>
-          <th class="num">Available</th>
-          <th class="num">Min</th>
+          <th>Product</th><th>SKU</th><th class="num">On Hand</th>
+          <th class="num">Available</th><th class="num">Min</th>
           {% if show_cost %}<th class="num">Avg Cost</th><th class="num">Value</th>{% endif %}
-          <th>Supplier</th>
-          <th>Location</th>
+          <th>Supplier</th><th>Location</th>
+          {% if can(auth.PERM_MANAGE_ITEMS) %}<th>Action</th>{% endif %}
         </tr>
       </thead>
       <tbody>
@@ -48,19 +53,18 @@
           <td class="num muted">{{ "{:g}".format(r.available) }}</td>
           <td class="num">{{ "{:g}".format(r.minimum) }}</td>
           {% if show_cost %}
-          <td class="num">₹{{ "{:,.2f}".format(r.item.avg_cost or 0) }}</td>
-          <td class="num">₹{{ "{:,.2f}".format(r.value) }}</td>
+          <td class="num">&#8377;{{ "{:,.2f}".format(r.item.avg_cost or 0) }}</td>
+          <td class="num">&#8377;{{ "{:,.2f}".format(r.value) }}</td>
           {% endif %}
-          <td>{{ r.item.preferred_supplier.name if r.item.preferred_supplier else "—" }}</td>
+          <td>{{ r.item.preferred_supplier.name if r.item.preferred_supplier else "-" }}</td>
           <td>{{ r.location }}</td>
+          {% if can(auth.PERM_MANAGE_ITEMS) %}<td><a href="/inventory/{{ r.item.id }}/edit">Edit</a></td>{% endif %}
         </tr>
         {% else %}
-        <tr><td colspan="9" class="empty">No items match these filters.</td></tr>
+        <tr><td colspan="{{ 10 if can(auth.PERM_MANAGE_ITEMS) else 9 }}" class="empty">No items match these filters.</td></tr>
         {% endfor %}
       </tbody>
     </table>
   </div>
 </div>
-<p class="muted small">Creating and editing items on the web arrives in phase W2 —
-  the engine behind it is already live.</p>
 {% endblock %}

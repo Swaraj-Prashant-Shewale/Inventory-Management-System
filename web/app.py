@@ -12,7 +12,19 @@ STATIC = Path(__file__).resolve().parent / "static"
 
 
 def create_app() -> FastAPI:
-    from web import routes_admin, routes_auth, routes_main
+    from web import (
+        routes_admin,
+        routes_analytics,
+        routes_auth,
+        routes_documents,
+        routes_finance,
+        routes_main,
+        routes_operations,
+        routes_orders,
+        routes_returns,
+        routes_search,
+        routes_w2,
+    )
 
     app = FastAPI(
         title="Inventory Management System",
@@ -21,6 +33,14 @@ def create_app() -> FastAPI:
 
     app.include_router(routes_auth.router)
     app.include_router(routes_admin.router)
+    app.include_router(routes_w2.router)
+    app.include_router(routes_orders.router)
+    app.include_router(routes_operations.router)
+    app.include_router(routes_analytics.router)
+    app.include_router(routes_documents.router)
+    app.include_router(routes_finance.router)
+    app.include_router(routes_returns.router)
+    app.include_router(routes_search.router)
     app.include_router(routes_main.router)
     app.mount("/static", StaticFiles(directory=str(STATIC)), name="static")
 

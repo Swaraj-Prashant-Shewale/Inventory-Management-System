@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% set active = 'receiving' %}
+{% block title %}{{ order.number }}{% endblock %}
+{% block content %}
+<div class="screen-head"><div><h1 class="screen-title">{{ order.number }}</h1><span class="muted">{{ order.supplier.name }} &middot; {{ order.warehouse.name }}</span></div><a class="btn" href="/receiving">All Purchase Orders</a></div>
+{% if saved %}<div class="status-banner success" role="status">Completed <strong>{{ saved }}</strong>.</div>{% endif %}{% if error %}<p class="form-error" role="alert">{{ error }}</p>{% endif %}
+<section class="order-summary"><dl><div><dt>Status</dt><dd>{{ PurchaseStatus.LABELS.get(order.status, order.status) }}</dd></div><div><dt>Order date</dt><dd>{{ order.order_date.strftime("%d %b %Y") }}</dd></div><div><dt>Expected</dt><dd>{{ order.expected_date.strftime("%d %b %Y") if order.expected_date else "-" }}</dd></div><div><dt>Supplier invoice</dt><dd>{{ order.supplier_invoice_no or "-" }}</dd></div><div><dt>Total</dt><dd>&#8377;{{ "{:,.2f}".format(order.total or 0) }}</dd></div></dl></section>
+<section class="order-lines"><div class="table-scroll"><table><thead><tr><th>Item</th><th class="num">Ordered</th><th class="num">Received</th><th class="num">Outstanding</th><th class="num">Unit cost</th><th class="num">Line total</th></tr></thead><tbody>{% for line in lines %}<tr><td><span class="strong">{{ line.item.name }}</span><br><span class="muted small">{{ line.item.sku }}</span></td><td class="num">{{ "{:g}".format(line.quantity) }}</td><td class="num">{{ "{:g}".format(line.received_quantity) }}</td><td class="num">{{ "{:g}".format(line.outstanding) }}</td><td class="num">&#8377;{{ "{:,.2f}".format(line.unit_cost) }}</td><td class="num">&#8377;{{ "{:,.2f}".format(line.line_total) }}</td></tr>{% endfor %}</tbody></table></div></section>
+<div class="form-actions">
+  {% if order.status == PurchaseStatus.DRAFT and can(auth.PERM_CREATE_PURCHASE) %}<form method="post" action="/receiving/{{ order.id }}/confirm" class="inline"><input type="hidden" name="csrf_token" value="{{ csrf }}"><button class="btn primary" type="submit">Confirm Order</button></form>{% endif %}
+  {% if order.status in (PurchaseStatus.ORDERED, PurchaseStatus.PARTIAL) and can(auth.PERM_RECEIVE_GOODS) %}<a class="btn primary" href="/receiving/{{ order.id }}/receive">Receive Goods</a>{% endif %}
+  {% if order.status in (PurchaseStatus.PARTIAL, PurchaseStatus.RECEIVED) and can(auth.PERM_RECEIVE_GOODS) %}<a class="btn" href="/operations/returns/supplier/new?order={{ order.id }}">Return to Supplier</a>{% endif %}
+</div>
+<section class="document-panel" aria-labelledby="purchase-documents-title">
+  <h2 id="purchase-documents-title">Documents</h2>
+  <div class="document-list">
+    <a class="btn" href="/documents/purchase-orders/{{ order.id }}.pdf">Download Purchase Order</a>
+    {% for receipt in receipts %}
+    <a class="btn" href="/documents/goods-receipts/{{ receipt.id }}.pdf">Download GRN {{ receipt.number }}</a>
+    {% endfor %}
+  </div>
+</section>
+{% if order.notes %}<section class="plain-notes"><h2>Notes</h2><p>{{ order.notes }}</p></section>{% endif %}
+{% endblock %}

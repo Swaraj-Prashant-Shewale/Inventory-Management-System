@@ -133,6 +133,8 @@ class DocType:
     CUSTOMER_RETURN = "CUSTOMER_RETURN"
     SUPPLIER_RETURN = "SUPPLIER_RETURN"
     OPENING = "OPENING"
+    LAB_CHECK_IN = "LAB_CHECK_IN"
+    LAB_CHECK_OUT = "LAB_CHECK_OUT"
     LABELS = {
         GOODS_RECEIPT: "Goods Receipt",
         FULFILLMENT: "Fulfilment",
@@ -143,6 +145,8 @@ class DocType:
         CUSTOMER_RETURN: "Customer Return",
         SUPPLIER_RETURN: "Supplier Return",
         OPENING: "Opening Balance",
+        LAB_CHECK_IN: "Lab Check In",
+        LAB_CHECK_OUT: "Lab Check Out",
     }
 
 

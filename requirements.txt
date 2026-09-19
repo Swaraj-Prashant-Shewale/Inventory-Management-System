@@ -1,4 +1,4 @@
-PySide6==6.10.2
+PySide6==6.10.2; sys_platform == "win32"
 peewee==4.0.0
 psycopg2-binary==2.9.11
 python-dotenv==1.2.1
@@ -16,6 +16,7 @@ jinja2
 python-multipart
 itsdangerous
 httpx
+qrcode          # optional: draws the admin-2fa enrolment QR in the terminal
 
 # Packaging (desktop build, being retired once the web app is live)
-pyinstaller==6.19.0
+pyinstaller==6.19.0; sys_platform == "win32"

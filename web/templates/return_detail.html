@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% set active = 'operations' %}
+{% set customer_return = kind == 'customer' %}
+{% block title %}{{ record.number }}{% endblock %}
+{% block content %}
+<div class="screen-head"><div><h1 class="screen-title">{{ record.number }}</h1><span class="muted">{{ record.customer.name if customer_return else record.supplier.name }} &middot; {{ record.warehouse.name }}</span></div><a class="btn" href="/operations/returns?kind={{ kind }}">All Returns</a></div>
+<section class="order-summary"><dl><div><dt>Date</dt><dd>{{ record.return_date.strftime("%d %b %Y") }}</dd></div><div><dt>Related order</dt><dd>{{ record.order.number if record.order else '-' }}</dd></div><div><dt>Reason</dt><dd>{{ record.reason or '-' }}</dd></div>{% if customer_return %}<div><dt>Disposition</dt><dd>{{ 'Returned to stock' if record.restock else 'Scrapped' }}</dd></div>{% endif %}<div><dt>Total value</dt><dd>&#8377;{{ "{:,.2f}".format(record.total or 0) }}</dd></div><div><dt>Recorded by</dt><dd>{{ record.created_by.full_name if record.created_by else '-' }}</dd></div></dl></section>
+<section class="order-lines"><div class="table-scroll"><table><thead><tr><th>Item</th><th>SKU</th><th class="num">Quantity</th><th class="num">{{ 'Return price' if customer_return else 'Unit cost' }}</th><th>Batch</th><th class="num">Line value</th></tr></thead><tbody>{% for line in lines %}<tr><td class="strong">{{ line.item.name }}</td><td>{{ line.item.sku }}</td><td class="num">{{ "{:g}".format(line.quantity) }}</td><td class="num">&#8377;{{ "{:,.2f}".format(line.unit_price if customer_return else line.unit_cost) }}</td><td>{{ line.lot.lot_number if line.lot else '-' }}</td><td class="num">&#8377;{{ "{:,.2f}".format(line.quantity * (line.unit_price if customer_return else line.unit_cost)) }}</td></tr>{% endfor %}</tbody></table></div></section>
+{% if record.notes %}<section class="plain-notes"><h2>Notes</h2><p>{{ record.notes }}</p></section>{% endif %}
+{% endblock %}

@@ -1,0 +1,138 @@
+{% extends "base.html" %}
+{% set active = 'inventory' %}
+{% block title %}{{ "Edit Item" if item else "New Item" }}{% endblock %}
+{% block content %}
+<div class="screen-head">
+  <div>
+    <h1 class="screen-title">{{ "EDIT ITEM" if item else "NEW ITEM" }}</h1>
+    {% if item %}<span class="muted">{{ item.sku }} &middot; {{ item.name }}</span>{% endif %}
+  </div>
+  <a class="btn" href="/inventory">Back to Inventory</a>
+</div>
+
+{% if error %}<p class="form-error" role="alert">{{ error }}</p>{% endif %}
+
+<form method="post" class="master-form"
+      action="{{ '/inventory/' ~ item.id ~ '/edit' if item else '/inventory/new' }}">
+  <input type="hidden" name="csrf_token" value="{{ csrf }}">
+
+  <section class="form-section" aria-labelledby="identity-title">
+    <div class="section-head">
+      <h2 id="identity-title">Identity</h2>
+      <span class="muted small">SKU and barcode can be scanned at Check In / Out</span>
+    </div>
+    <div class="form-grid">
+      <label>SKU
+        <input type="text" name="sku" value="{{ values.sku }}" maxlength="40"
+               autocomplete="off" required autofocus>
+      </label>
+      <label>Barcode or QR value
+        <input type="text" name="barcode" value="{{ values.barcode }}" maxlength="60"
+               autocomplete="off">
+      </label>
+      <label class="wide-field">Item name
+        <input type="text" name="name" value="{{ values.name }}" maxlength="200" required>
+      </label>
+      <label>Category
+        <select name="category_id">
+          <option value="">No category</option>
+          {% for category in categories %}
+          <option value="{{ category.id }}"
+                  {{ 'selected' if values.category_id|string == category.id|string else '' }}>
+            {{ category.name }}
+          </option>
+          {% endfor %}
+        </select>
+      </label>
+      <label>Preferred supplier
+        <select name="supplier_id">
+          <option value="">No preferred supplier</option>
+          {% for supplier in suppliers %}
+          <option value="{{ supplier.id }}"
+                  {{ 'selected' if values.supplier_id|string == supplier.id|string else '' }}>
+            {{ supplier.name }}
+          </option>
+          {% endfor %}
+        </select>
+      </label>
+      <label class="wide-field">Description
+        <textarea name="description" rows="3">{{ values.description }}</textarea>
+      </label>
+    </div>
+  </section>
+
+  <section class="form-section" aria-labelledby="stock-title">
+    <div class="section-head"><h2 id="stock-title">Units and stock</h2></div>
+    <div class="form-grid">
+      <label>Base unit
+        <select name="base_uom_id" required>
+          <option value="">Choose unit</option>
+          {% for uom in uoms %}
+          <option value="{{ uom.id }}"
+                  {{ 'selected' if values.base_uom_id|string == uom.id|string else '' }}>
+            {{ uom.code }} &middot; {{ uom.name }}
+          </option>
+          {% endfor %}
+        </select>
+      </label>
+      <label>Purchase unit
+        <select name="purchase_uom_id">
+          <option value="">Same as base unit</option>
+          {% for uom in uoms %}
+          <option value="{{ uom.id }}"
+                  {{ 'selected' if values.purchase_uom_id|string == uom.id|string else '' }}>
+            {{ uom.code }} &middot; {{ uom.name }}
+          </option>
+          {% endfor %}
+        </select>
+      </label>
+      <label>Base units per purchase unit
+        <input type="number" name="pack_size" value="{{ values.pack_size }}"
+               min="0.001" step="0.001" required>
+      </label>
+      <label>Minimum stock
+        <input type="number" name="min_level" value="{{ values.min_level }}"
+               min="0" step="0.001" required>
+      </label>
+      <label>Maximum stock
+        <input type="number" name="max_level" value="{{ values.max_level }}"
+               min="0" step="0.001" required>
+      </label>
+    </div>
+  </section>
+
+  <section class="form-section" aria-labelledby="commercial-title">
+    <div class="section-head"><h2 id="commercial-title">Commercial and tracking</h2></div>
+    <div class="form-grid">
+      <label>HSN code
+        <input type="text" name="hsn_code" value="{{ values.hsn_code }}" maxlength="10">
+      </label>
+      <label>GST rate (%)
+        <input type="number" name="gst_rate" value="{{ values.gst_rate }}"
+               min="0" max="100" step="0.01" required>
+      </label>
+      <label>Selling price
+        <input type="number" name="selling_price" value="{{ values.selling_price }}"
+               min="0" step="0.01" required>
+      </label>
+      <label>Shelf life (days)
+        <input type="number" name="shelf_life_days" value="{{ values.shelf_life_days }}"
+               min="1" step="1">
+      </label>
+    </div>
+    <div class="check-row">
+      <label class="check"><input type="checkbox" name="is_lot_tracked" value="1"
+        {{ 'checked' if values.is_lot_tracked else '' }}> Track batches and expiry</label>
+      <label class="check"><input type="checkbox" name="is_serial_tracked" value="1"
+        {{ 'checked' if values.is_serial_tracked else '' }}> Track serial numbers</label>
+      <label class="check"><input type="checkbox" name="is_active" value="1"
+        {{ 'checked' if values.is_active else '' }}> Active item</label>
+    </div>
+  </section>
+
+  <div class="form-actions">
+    <a class="btn" href="/inventory">Cancel</a>
+    <button class="btn primary" type="submit">{{ "Save Changes" if item else "Create Item" }}</button>
+  </div>
+</form>
+{% endblock %}

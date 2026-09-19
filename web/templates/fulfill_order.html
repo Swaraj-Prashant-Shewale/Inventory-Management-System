@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% set active = 'shipping' %}
+{% block title %}Ship {{ order.number }}{% endblock %}
+{% block content %}
+<div class="screen-head"><div><h1 class="screen-title">SHIP GOODS</h1><span class="muted">Against {{ order.number }} for {{ order.customer.name }}</span></div><a class="btn" href="/shipping/{{ order.id }}">Back</a></div>
+{% if error %}<p class="form-error" role="alert">{{ error }}</p>{% endif %}
+<form method="post" action="/shipping/{{ order.id }}/fulfill" class="master-form"><input type="hidden" name="csrf_token" value="{{ csrf }}">
+  <section class="form-section"><div class="form-grid"><label>Ship date<input type="date" name="ship_date" value="{{ today }}" required></label><label>Truck registration<input name="truck_hsrp" value="{{ order.truck_hsrp or '' }}" maxlength="20"></label><label class="wide-field">Notes<textarea name="notes" rows="2" maxlength="500"></textarea></label></div></section>
+  <section class="order-lines"><div class="section-head"><h2>Outstanding items</h2><span class="muted small">Leave quantity blank for items not shipping today</span></div><div class="table-scroll"><table><thead><tr><th>Item</th><th class="num">Outstanding</th><th>Ship quantity</th><th>Serial numbers</th></tr></thead><tbody>{% for line in lines %}<tr><td><input type="hidden" name="line_id" value="{{ line.id }}"><span class="strong">{{ line.item.name }}</span><br><span class="muted small">{{ line.item.sku }}</span></td><td class="num">{{ "{:g}".format(line.outstanding) }}</td><td><input type="number" name="quantity" min="0.001" max="{{ line.outstanding }}" step="0.001"></td><td><textarea name="serials" rows="2" placeholder="{{ 'Required, one per line' if line.item.is_serial_tracked else 'Not required' }}"></textarea></td></tr>{% else %}<tr><td colspan="4" class="empty">Nothing remains to ship.</td></tr>{% endfor %}</tbody></table></div></section>
+  <div class="form-actions"><a class="btn" href="/shipping/{{ order.id }}">Cancel</a><button class="btn primary" type="submit">Post Shipment</button></div>
+</form>
+{% endblock %}

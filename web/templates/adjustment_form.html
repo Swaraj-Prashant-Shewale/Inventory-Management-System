@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% set active = 'operations' %}
+{% block title %}New Stock Adjustment{% endblock %}
+{% block content %}
+<div class="screen-head"><div><h1 class="screen-title">NEW STOCK ADJUSTMENT</h1><span class="muted">Positive adds found stock; negative writes off missing or damaged stock</span></div><a class="btn" href="/operations?tab=adjustments">Back</a></div>
+{% if error %}<p class="form-error" role="alert">{{ error }}</p>{% endif %}
+<form method="post" action="/operations/adjustments" class="master-form"><input type="hidden" name="csrf_token" value="{{ csrf }}">
+  <section class="form-section"><div class="form-grid"><label>Warehouse<select name="warehouse_id" required><option value="">Choose warehouse</option>{% for warehouse in warehouses %}<option value="{{ warehouse.id }}" {{ 'selected' if values.warehouse_id|string == warehouse.id|string else '' }}>{{ warehouse.name }}</option>{% endfor %}</select></label><label>Reason<select name="reason" required>{% for reason in AdjustmentReason.ALL %}<option value="{{ reason }}" {{ 'selected' if values.reason == reason else '' }}>{{ AdjustmentReason.LABELS[reason] }}</option>{% endfor %}</select></label><label>Date<input type="date" name="adjustment_date" value="{{ values.adjustment_date }}" required></label><label class="wide-field">Notes<textarea name="notes" rows="2" maxlength="500">{{ values.notes }}</textarea></label></div></section>
+  <section class="order-lines"><div class="section-head"><h2>Adjustment lines</h2><span class="muted small">Stock moves only after manager approval</span></div><div class="table-scroll"><table><thead><tr><th>#</th><th>Item</th><th>Adjust by (+/-)</th><th>Line note</th></tr></thead><tbody>{% for row in rows %}<tr><td>{{ loop.index }}</td><td><select name="item_id"><option value="">Choose item</option>{% for item in items %}<option value="{{ item.id }}" {{ 'selected' if row.item_id|string == item.id|string else '' }}>{{ item.sku }} &middot; {{ item.name }}</option>{% endfor %}</select></td><td><input type="number" name="quantity" value="{{ row.quantity }}" step="0.001"></td><td><input name="line_note" value="{{ row.note }}" maxlength="200"></td></tr>{% endfor %}</tbody></table></div></section>
+  <div class="form-actions"><a class="btn" href="/operations?tab=adjustments">Cancel</a><button class="btn primary" type="submit">Save for Approval</button></div>
+</form>
+{% endblock %}

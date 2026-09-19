@@ -1,0 +1,170 @@
+{% extends "base.html" %}
+{% set active = 'lab_movements' %}
+{% block title %}Check In / Out{% endblock %}
+{% block content %}
+<div class="screen-head">
+  <h1 class="screen-title">CHECK IN / OUT</h1>
+  <span class="muted">{{ movements|length }} recent movement(s)</span>
+</div>
+
+{% if saved %}
+<div class="status-banner success" role="status">
+  Movement recorded. Reference <strong>{{ saved }}</strong>.
+</div>
+{% endif %}
+{% if error %}<div class="form-error" role="alert">{{ error }}</div>{% endif %}
+
+{% if review %}
+<section class="confirm-panel" aria-labelledby="confirm-title">
+  <h2 id="confirm-title">Confirm {{ "check in" if review.direction == Direction.IN else "check out" }}</h2>
+  <dl class="movement-summary">
+    <div>
+      <dt>Item</dt>
+      <dd>{{ review.item.name }} <span class="muted">{{ review.item.sku }}</span></dd>
+    </div>
+    <div><dt>Warehouse</dt><dd>{{ review.warehouse.name }}</dd></div>
+    <div><dt>Quantity</dt><dd>{{ "{:g}".format(review.quantity) }}</dd></div>
+    <div>
+      <dt>Balance</dt>
+      <dd>{{ "{:g}".format(review.current) }} &rarr; {{ "{:g}".format(review.resulting) }}</dd>
+    </div>
+    {% if review.lot_number %}
+    <div><dt>Batch</dt><dd>{{ review.lot_number }}</dd></div>
+    {% endif %}
+    {% if review.serials %}
+    <div><dt>Serials</dt><dd>{{ review.serials|join(", ") }}</dd></div>
+    {% endif %}
+    {% if review.notes %}
+    <div><dt>Notes</dt><dd>{{ review.notes }}</dd></div>
+    {% endif %}
+  </dl>
+  <form method="post" action="/lab-movements/commit" class="confirm-actions">
+    <input type="hidden" name="csrf_token" value="{{ csrf }}">
+    {% for key, value in form.items() %}
+    <input type="hidden" name="{{ key }}" value="{{ value }}">
+    {% endfor %}
+    <a class="btn" href="/lab-movements?direction={{ form.direction }}">Cancel</a>
+    <button type="submit" class="btn primary">
+      Confirm {{ "Check In" if review.direction == Direction.IN else "Check Out" }}
+    </button>
+  </form>
+</section>
+{% else %}
+<section class="movement-workspace">
+  <form method="post" action="/lab-movements/review" class="movement-form">
+    <input type="hidden" name="csrf_token" value="{{ csrf }}">
+
+    <fieldset class="direction-control">
+      <legend>Movement</legend>
+      <label class="direction-option in">
+        <input type="radio" name="direction" value="IN"
+               {{ 'checked' if form.direction == Direction.IN else '' }}>
+        <span>Check In</span>
+      </label>
+      <label class="direction-option out">
+        <input type="radio" name="direction" value="OUT"
+               {{ 'checked' if form.direction == Direction.OUT else '' }}>
+        <span>Check Out</span>
+      </label>
+    </fieldset>
+
+    <div class="movement-fields">
+      <label class="scan-field">Item SKU or barcode
+        <input type="search" name="item_code" value="{{ form.item_code }}"
+               list="item-codes" placeholder="Scan or enter code"
+               autocomplete="off" autofocus required>
+      </label>
+      <datalist id="item-codes">
+        {% for item in items %}
+        <option value="{{ item.sku }}">
+          {{ item.name }}{% if item.barcode %} &middot; {{ item.barcode }}{% endif %}
+        </option>
+        {% endfor %}
+      </datalist>
+
+      <label>Warehouse
+        <select name="warehouse_id" required>
+          {% for warehouse in warehouses %}
+          <option value="{{ warehouse.id }}"
+                  {{ 'selected' if form.warehouse_id|string == warehouse.id|string else '' }}>
+            {{ warehouse.name }} ({{ warehouse.code }})
+          </option>
+          {% endfor %}
+        </select>
+      </label>
+
+      <label>Quantity
+        <input type="number" name="quantity" value="{{ form.quantity }}"
+               min="0.001" step="0.001" required>
+      </label>
+
+      <label>Unit cost (check in)
+        <input type="number" name="unit_cost" value="{{ form.unit_cost }}"
+               min="0" step="0.01">
+      </label>
+
+      <label>Batch number
+        <input type="text" name="lot_number" value="{{ form.lot_number }}"
+               maxlength="80">
+      </label>
+
+      <label>Expiry date
+        <input type="date" name="expiry_date" value="{{ form.expiry_date }}">
+      </label>
+
+      <label class="full-field">Serial numbers
+        <textarea name="serials" rows="3"
+                  placeholder="One per line or comma separated">{{ form.serials }}</textarea>
+      </label>
+
+      <label class="full-field">Notes
+        <textarea name="notes" rows="3" maxlength="500"
+                  placeholder="Person, project, purpose or source">{{ form.notes }}</textarea>
+      </label>
+    </div>
+
+    <div class="form-actions">
+      <button type="submit" class="btn primary">Review Movement</button>
+    </div>
+  </form>
+</section>
+{% endif %}
+
+<section class="movement-history">
+  <div class="section-head"><h2>Recent Lab Movements</h2></div>
+  <div class="table-scroll">
+    <table>
+      <thead>
+        <tr>
+          <th>Time</th><th>Direction</th><th>Item</th>
+          <th class="num">Quantity</th><th class="num">Balance</th>
+          <th>Warehouse</th><th>By</th><th>Notes</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for movement in movements %}
+        <tr>
+          <td class="muted nowrap">{{ movement.timestamp.strftime("%d %b %Y, %H:%M") }}</td>
+          <td>
+            <span class="movement-pill {{ 'in' if movement.direction == Direction.IN else 'out' }}">
+              {{ "IN" if movement.direction == Direction.IN else "OUT" }}
+            </span>
+          </td>
+          <td>
+            <span class="strong">{{ movement.item.name }}</span><br>
+            <span class="muted small">{{ movement.item.sku }}</span>
+          </td>
+          <td class="num">{{ "{:g}".format(movement.quantity) }}</td>
+          <td class="num">{{ "{:g}".format(movement.balance_after) }}</td>
+          <td>{{ movement.warehouse.name }}</td>
+          <td>{{ movement.user.full_name if movement.user else "&mdash;"|safe }}</td>
+          <td>{{ movement.notes or "&mdash;"|safe }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="8" class="empty">No lab movements recorded yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}

@@ -1,0 +1,43 @@
+.payment-summary {
+  max-width: 820px;
+  margin-bottom: 16px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.payment-summary dl {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin: 0;
+}
+.payment-summary dl > div {
+  padding: 14px 16px;
+  border-right: 1px solid var(--border);
+}
+.payment-summary dl > div:last-child { border-right: 0; }
+.payment-summary dt {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+.payment-summary dd {
+  margin: 4px 0 0;
+  font-size: 20px;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+.payment-form { max-width: 820px; }
+.overpayment-check { margin-top: 4px; }
+.payment-history { margin-top: 18px; }
+.payment-history h2 { margin: 0 0 10px; font-size: 17px; }
+
+@media (max-width: 600px) {
+  .payment-summary dl { grid-template-columns: 1fr; }
+  .payment-summary dl > div {
+    border-right: 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .payment-summary dl > div:last-child { border-bottom: 0; }
+}

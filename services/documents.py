@@ -7,9 +7,11 @@ the total in words, and a rounded grand total.
 """
 import datetime
 import logging
-import os
 import re
+import shutil
+import tempfile
 from decimal import Decimal
+from pathlib import Path
 
 from reportlab.lib import colors
 from reportlab.lib.enums import TA_CENTER, TA_RIGHT
@@ -720,8 +722,10 @@ def barcode_labels(items, path=None, copies=1, include_price=True) -> str:
     settings = company()
     styles = _styles()
     path = path or output_dir() / f"labels-{datetime.date.today():%Y%m%d-%H%M%S}.pdf"
-    temp_dir = output_dir() / "_barcodes"
-    temp_dir.mkdir(parents=True, exist_ok=True)
+    # Keep intermediates beside the requested output. Web downloads pass a path in the
+    # platform temp directory, which is the only writable location on serverless hosts.
+    temp_dir = Path(tempfile.mkdtemp(
+        prefix="ims_barcodes_", dir=str(Path(path).parent)))
 
     story = [Paragraph("Item Labels", styles["title"]),
              Paragraph(f"{settings.legal_name or ''} · "
@@ -729,7 +733,6 @@ def barcode_labels(items, path=None, copies=1, include_price=True) -> str:
              Spacer(1, 5 * mm)]
 
     cells = []
-    generated = []
     for item in items:
         code = (item.barcode or item.sku or "").strip()
         if not code:
@@ -742,7 +745,6 @@ def barcode_labels(items, path=None, copies=1, include_price=True) -> str:
                 "module_height": 9.0, "font_size": 7, "text_distance": 2.0,
                 "quiet_zone": 2.0, "dpi": 300,
             })
-            generated.append(image_path)
         except Exception as exc:
             log.warning("Could not render a barcode for %s: %s", item.sku, exc)
             continue
@@ -756,6 +758,7 @@ def barcode_labels(items, path=None, copies=1, include_price=True) -> str:
             cells.append(cell)
 
     if not cells:
+        shutil.rmtree(temp_dir, ignore_errors=True)
         raise DocumentError(
             "None of the selected items have a barcode or SKU to print.")
 
@@ -774,10 +777,7 @@ def barcode_labels(items, path=None, copies=1, include_price=True) -> str:
     ]))
     story.append(table)
 
-    result = _build(path, story, "Item Labels")
-    for image_path in generated:
-        try:
-            os.remove(image_path)
-        except OSError:
-            pass
-    return result
+    try:
+        return _build(path, story, "Item Labels")
+    finally:
+        shutil.rmtree(temp_dir, ignore_errors=True)

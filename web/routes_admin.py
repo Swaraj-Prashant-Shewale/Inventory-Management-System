@@ -15,7 +15,8 @@ from fastapi.responses import RedirectResponse
 
 import config
 from services import auth, tenancy
-from web import security
+from services import totp as totp_svc
+from web import ratelimit, security
 from web.context import check_csrf, redirect, render, resolve_admin
 
 log = logging.getLogger(__name__)
@@ -26,11 +27,24 @@ LOCKOUT_MINUTES = 15
 
 
 def _server_admin_credentials():
+    user = os.environ.get("PROVISION_DB_USER", "").strip()
+    password = os.environ.get("PROVISION_DB_PASSWORD", "").strip()
+    if user and password:
+        return user, password
+
+    # Backward compatibility for private, persistent deployments.
     user = os.environ.get("ADMIN_DB_USER", "").strip()
     password = os.environ.get("ADMIN_DB_PASSWORD", "").strip()
     if user and password:
         return user, password
     return None, None
+
+
+def _using_limited_provisioner():
+    return bool(
+        os.environ.get("PROVISION_DB_USER", "").strip()
+        and os.environ.get("PROVISION_DB_PASSWORD", "").strip()
+    )
 
 
 def _admin_connection():
@@ -68,7 +82,8 @@ def admin_login_page(request: Request):
 
 @router.post("/login")
 def admin_login_submit(request: Request, username: str = Form(""),
-                       password: str = Form(""), csrf_token: str = Form("")):
+                       password: str = Form(""), totp: str = Form(""),
+                       csrf_token: str = Form("")):
     context = resolve_admin(request)
     if not tenancy.is_multitenant():
         return render(context, "admin/unavailable.html", status_code=404)
@@ -80,6 +95,16 @@ def admin_login_submit(request: Request, username: str = Form(""),
     if not security.login_csrf_valid(
             request.cookies.get(security.LOGIN_CSRF_COOKIE), csrf_token):
         return fail("Your session expired — please try again.", status_code=400)
+
+    # Throttle per IP before the PBKDF2 verification (see web/ratelimit.py).
+    ip = ratelimit.client_ip(request)
+    wait = ratelimit.ADMIN_LOGIN_LIMITER.retry_after(ip)
+    if wait:
+        response = fail(
+            f"Too many sign-in attempts. Please wait {wait} seconds and try again.",
+            status_code=429)
+        response.headers["Retry-After"] = str(wait)
+        return response
 
     admin = tenancy.PlatformAdmin.get_or_none(
         tenancy.PlatformAdmin.username == (username or "").strip())
@@ -101,14 +126,24 @@ def admin_login_submit(request: Request, username: str = Form(""),
                 tenancy.PlatformAdmin.locked_until,
                 tenancy.PlatformAdmin.last_login_at]
 
-    if not auth.verify_password(password, admin.password_hash):
+    def register_failure(message):
         admin.failed_attempts = (admin.failed_attempts or 0) + 1
         if admin.failed_attempts >= LOCKOUT_THRESHOLD:
             admin.locked_until = now + datetime.timedelta(minutes=LOCKOUT_MINUTES)
             admin.failed_attempts = 0
         admin.save(only=tracking)
-        return fail("Incorrect username or password.")
+        return fail(message)
 
+    if not auth.verify_password(password, admin.password_hash):
+        return register_failure("Incorrect username or password.")
+
+    # Second factor. A wrong code after a correct password still counts toward the lockout,
+    # so an attacker who somehow has the password cannot brute-force the 6-digit code (5
+    # tries then locked). The code field is ignored for admins without 2FA enabled.
+    if admin.totp_secret and not totp_svc.verify(admin.totp_secret, totp):
+        return register_failure("Incorrect authentication code — check your app and retry.")
+
+    ratelimit.ADMIN_LOGIN_LIMITER.reset(ip)
     admin.failed_attempts = 0
     admin.locked_until = None
     admin.last_login_at = now
@@ -164,8 +199,8 @@ def admin_create_tenant(request: Request, slug: str = Form(""),
     if connection is None:
         return _tenants_error(
             context,
-            "Provisioning needs ADMIN_DB_USER and ADMIN_DB_PASSWORD set in the "
-            "server's environment. Use manage_platform.py instead.")
+            "Provisioning needs PROVISION_DB_USER and PROVISION_DB_PASSWORD set in "
+            "Vercel. Run manage_platform.py setup-web-provisioner locally first.")
 
     try:
         tenant_id, schema, username, password = tenancy.provision_tenant(
@@ -173,6 +208,7 @@ def admin_create_tenant(request: Request, slug: str = Form(""),
             slug=slug, display_name=display_name,
             owner_username=owner_username, owner_full_name=owner_name,
             state_code=(state_code or "").strip() or None,
+            ensure_registry_first=not _using_limited_provisioner(),
         )
     except tenancy.TenancyError as exc:
         return _tenants_error(context, str(exc))
@@ -189,6 +225,47 @@ def admin_create_tenant(request: Request, slug: str = Form(""),
     return render(context, "admin/created.html",
                   slug=slug, display_name=display_name, schema=schema,
                   owner_username=username, owner_password=password)
+
+
+@router.post("/tenants/{slug}/reset-owner")
+def admin_reset_owner(request: Request, slug: str,
+                      csrf_token: str = Form("")):
+    context = resolve_admin(request)
+    if context.admin is None:
+        return RedirectResponse("/admin/login", status_code=303)
+    if not check_csrf(context, csrf_token):
+        return _tenants_error(context, "The form expired — try again.")
+
+    connection, provision_password = _admin_connection()
+    if connection is None:
+        return _tenants_error(
+            context,
+            "Password reset needs PROVISION_DB_USER and PROVISION_DB_PASSWORD "
+            "set in Vercel."
+        )
+
+    try:
+        username, password = tenancy.reset_owner_password(
+            connection, provision_password, slug
+        )
+    except tenancy.TenancyError as exc:
+        return _tenants_error(context, str(exc))
+    except Exception:
+        log.exception("Owner password reset failed for tenant '%s'", slug)
+        return _tenants_error(
+            context, "Password reset failed — check the server logs for details."
+        )
+    finally:
+        connection.close()
+
+    log.warning(
+        "Admin '%s' reset the owner password for tenant '%s'",
+        context.admin.username, slug,
+    )
+    return render(
+        context, "admin/owner_reset.html",
+        slug=slug, owner_username=username, owner_password=password,
+    )
 
 
 def _tenants_error(context, message):

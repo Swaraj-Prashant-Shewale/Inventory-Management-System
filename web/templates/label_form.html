@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% set active = 'inventory' %}
+{% block title %}Item Labels{% endblock %}
+{% block content %}
+<div class="screen-head">
+  <div>
+    <h1 class="screen-title">ITEM LABELS</h1>
+    <span class="muted">Select the stock labels to include in the PDF</span>
+  </div>
+  <a class="btn" href="/inventory">Back to Inventory</a>
+</div>
+
+{% if error %}<p class="form-error" role="alert">{{ error }}</p>{% endif %}
+
+<form method="post" action="/documents/labels.pdf" class="label-form">
+  <input type="hidden" name="csrf_token" value="{{ csrf }}">
+  <div class="label-options">
+    <label>Copies per item
+      <input type="number" name="copies" value="{{ copies }}" min="1" max="10" step="1" required>
+    </label>
+    {% if can(auth.PERM_MANAGE_PRICING) %}
+    <label class="check"><input type="checkbox" name="include_price" value="1" {{ 'checked' if include_price else '' }}> Include selling price</label>
+    {% endif %}
+  </div>
+  <div class="card table-card">
+    <div class="table-scroll">
+      <table>
+        <thead><tr><th class="select-col">Print</th><th>Item</th><th>SKU</th><th>Barcode value</th>{% if can(auth.PERM_MANAGE_PRICING) %}<th class="num">Selling price</th>{% endif %}</tr></thead>
+        <tbody>
+          {% for item in items %}
+          <tr>
+            <td class="select-col"><input type="checkbox" name="item_id" value="{{ item.id }}" {{ 'checked' if item.id in selected else '' }} aria-label="Print {{ item.name }}"></td>
+            <td class="strong">{{ item.name }}</td>
+            <td>{{ item.sku }}</td>
+            <td class="muted">{{ item.barcode or item.sku }}</td>
+            {% if can(auth.PERM_MANAGE_PRICING) %}<td class="num">&#8377;{{ "{:,.2f}".format(item.selling_price or 0) }}</td>{% endif %}
+          </tr>
+          {% else %}
+          <tr><td colspan="{{ 5 if can(auth.PERM_MANAGE_PRICING) else 4 }}" class="empty">No active items are available.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <div class="form-actions">
+    <a class="btn" href="/inventory">Cancel</a>
+    <button class="btn primary" type="submit">Download Labels PDF</button>
+  </div>
+</form>
+{% endblock %}

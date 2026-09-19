@@ -22,6 +22,8 @@ from database.models import (
     Payment,
     PaymentStatus,
     SalesOrder,
+    Serial,
+    SerialStatus,
     SalesOrderLine,
     SalesStatus,
 )
@@ -422,6 +424,8 @@ def record_payment(order, amount, user=None, method="CASH", reference=None,
                    payment_date=None, notes=None, allow_overpayment=False) -> Payment:
     """Record a full or part payment against an order."""
     auth.require(user, auth.PERM_RECORD_PAYMENT, "record a payment")
+    if order.status == SalesStatus.CANCELLED:
+        raise SalesError(f"{order.number} is cancelled and cannot accept payments.")
     amount = _dec(amount)
     if amount <= 0:
         raise SalesError("Payment amount must be greater than zero.")
@@ -468,16 +472,81 @@ def outstanding_balance(customer=None):
 
 def create_customer_return(customer, warehouse, lines, user=None, order=None,
                            reason=None, restock=True, notes=None) -> CustomerReturn:
-    """Take goods back from a customer.
+    """Take goods back from a customer, optionally returning them to stock.
 
-    `lines`: [{item, quantity, unit_price (optional), lot (optional)}]
-    With `restock=False` the goods are scrapped: the return is recorded but no stock
-    comes back in.
+    A linked order constrains each item to the quantity actually shipped minus earlier
+    returns. Serialized units must currently be shipped; restocked units become
+    IN_STOCK again, while non-restocked units become SCRAPPED.
     """
     auth.require(user, auth.PERM_CREATE_SALES, "accept a customer return")
-    lines = [line for line in lines if _dec(line.get("quantity")) > 0]
-    if not lines:
+    if customer is None or warehouse is None:
+        raise SalesError("Choose the customer and warehouse for this return.")
+    if order is not None and (order.customer_id != customer.id
+                              or order.warehouse_id != warehouse.id):
+        raise SalesError(
+            "The linked sales order must belong to the selected customer and warehouse.")
+
+    prepared = []
+    requested = {}
+    serial_keys = set()
+    for line in lines:
+        quantity = _dec(line.get("quantity"))
+        if not quantity.is_finite() or quantity <= 0:
+            continue
+        item = line.get("item")
+        if item is None:
+            raise SalesError("Every customer return line needs an item.")
+        serials = [str(value).strip() for value in (line.get("serials") or [])
+                   if str(value).strip()]
+        if len(serials) != len(set(serials)):
+            raise SalesError(f"{item.name}: each serial number can appear only once.")
+        if item.is_serial_tracked:
+            if quantity != quantity.to_integral_value() or len(serials) != int(quantity):
+                raise SalesError(
+                    f"{item.name}: enter one serial number for each returned unit.")
+            serial_records = []
+            for number in serials:
+                key = (item.id, number)
+                if key in serial_keys:
+                    raise SalesError(f"Serial {number} appears on more than one line.")
+                serial_keys.add(key)
+                serial = Serial.get_or_none(
+                    (Serial.item == item) & (Serial.serial_number == number))
+                if serial is None or serial.status != SerialStatus.SHIPPED:
+                    raise SalesError(
+                        f"Serial {number} is not recorded as shipped for {item.name}.")
+                serial_records.append(serial)
+        else:
+            if serials:
+                raise SalesError(f"{item.name} is not configured for serial tracking.")
+            serial_records = []
+        entry = dict(line)
+        entry.update({"item": item, "quantity": quantity, "serials": serials,
+                      "serial_records": serial_records})
+        prepared.append(entry)
+        requested[item.id] = requested.get(item.id, ZERO) + quantity
+    if not prepared:
         raise SalesError("A customer return needs at least one line.")
+
+    if order is not None:
+        shipped = {}
+        for order_line in order.lines:
+            shipped[order_line.item_id] = (
+                shipped.get(order_line.item_id, ZERO) + _dec(order_line.shipped_quantity))
+        previous = {}
+        prior_lines = (CustomerReturnLine.select(CustomerReturnLine)
+                       .join(CustomerReturn)
+                       .where(CustomerReturn.order == order))
+        for line in prior_lines:
+            previous[line.item_id] = previous.get(line.item_id, ZERO) + _dec(line.quantity)
+        for item_id, quantity in requested.items():
+            remaining = shipped.get(item_id, ZERO) - previous.get(item_id, ZERO)
+            if quantity > remaining:
+                item = next(entry["item"] for entry in prepared
+                            if entry["item"].id == item_id)
+                raise SalesError(
+                    f"{item.name}: only {inventory.fmt_qty(max(ZERO, remaining))} "
+                    "shipped unit(s) remain eligible for return on this order.")
 
     with db.atomic():
         record = CustomerReturn.create(
@@ -487,13 +556,13 @@ def create_customer_return(customer, warehouse, lines, user=None, order=None,
             notes=notes, created_by=user,
         )
         total = ZERO
-        for line in lines:
-            item = line["item"]
-            quantity = _dec(line["quantity"])
-            unit_price = _dec(line.get("unit_price", item.selling_price))
+        for entry in prepared:
+            item = entry["item"]
+            quantity = entry["quantity"]
+            unit_price = _dec(entry.get("unit_price", item.selling_price))
             unit_cost = _dec(item.avg_cost)
 
-            lot = line.get("lot")
+            lot = entry.get("lot")
             if restock:
                 if item.is_lot_tracked and lot is None:
                     lot = inventory.get_or_create_lot(
@@ -506,10 +575,17 @@ def create_customer_return(customer, warehouse, lines, user=None, order=None,
                     lot=lot, user=user, customer=customer,
                     notes=reason or "Returned by customer",
                 )
+                inventory.receive_serials(
+                    item, warehouse, entry["serials"], lot=lot, unit_cost=unit_cost)
+            else:
+                for serial in entry["serial_records"]:
+                    serial.status = SerialStatus.SCRAPPED
+                    serial.warehouse = None
+                    serial.save()
 
-            CustomerReturnLine.create(customer_return=record, item=item,
-                                      quantity=quantity, unit_price=unit_price,
-                                      unit_cost=unit_cost, lot=lot)
+            CustomerReturnLine.create(
+                customer_return=record, item=item, quantity=quantity,
+                unit_price=unit_price, unit_cost=unit_cost, lot=lot)
             total += quantity * unit_price
 
         record.total = total
@@ -517,7 +593,7 @@ def create_customer_return(customer, warehouse, lines, user=None, order=None,
 
     auth.record_audit(
         user, "CREATE", "CustomerReturn", record.id,
-        f"{record.number}: {len(lines)} line(s) from {customer.name}"
+        f"{record.number}: {len(prepared)} line(s) from {customer.name}"
         + ("" if restock else " (scrapped, not restocked)"),
     )
     return record

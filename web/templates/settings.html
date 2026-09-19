@@ -1,0 +1,133 @@
+{% extends "base.html" %}
+{% set active = 'settings' %}
+{% block title %}Settings{% endblock %}
+{% block content %}
+<div class="screen-head">
+  <h1 class="screen-title">SETTINGS</h1>
+  <span class="muted">Company master data and access</span>
+</div>
+
+<nav class="settings-tabs" aria-label="Settings sections">
+  {% if 'warehouses' in allowed_tabs %}<a href="/settings?tab=warehouses" class="{{ 'active' if tab == 'warehouses' else '' }}">Warehouses</a>{% endif %}
+  {% if 'employees' in allowed_tabs %}<a href="/settings?tab=employees" class="{{ 'active' if tab == 'employees' else '' }}">Employees</a>{% endif %}
+  {% if 'users' in allowed_tabs %}<a href="/settings?tab=users" class="{{ 'active' if tab == 'users' else '' }}">Users &amp; Roles</a>{% endif %}
+</nav>
+
+{% if saved %}<div class="status-banner success" role="status">Saved <strong>{{ saved }}</strong>.</div>{% endif %}
+{% if error %}<p class="form-error" role="alert">{{ error }}</p>{% endif %}
+
+{% if tab == 'warehouses' %}
+<section class="settings-section">
+  <div class="section-head"><h2>Warehouses</h2><span class="muted small">Stock is tracked separately at each location</span></div>
+  <div class="table-scroll">
+    <table>
+      <thead><tr><th>Code</th><th>Name</th><th>GST state</th><th>City</th><th>Phone</th><th>Active</th></tr></thead>
+      <tbody>
+        {% for warehouse in warehouses %}
+        <tr><td class="strong">{{ warehouse.code }}</td><td>{{ warehouse.name }}</td>
+          <td>{{ warehouse.state_code or "-" }}</td><td>{{ warehouse.city or "-" }}</td>
+          <td>{{ warehouse.phone or "-" }}</td><td>{{ "Yes" if warehouse.is_active else "No" }}</td></tr>
+        {% else %}<tr><td colspan="6" class="empty">No warehouses yet.</td></tr>{% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+<section class="form-section compact-form-section">
+  <div class="section-head"><h2>Add warehouse</h2></div>
+  <form method="post" action="/settings/warehouses" class="master-form">
+    <input type="hidden" name="csrf_token" value="{{ csrf }}">
+    <div class="form-grid">
+      <label>Code<input name="code" maxlength="20" placeholder="WH2" required></label>
+      <label>Name<input name="name" maxlength="120" placeholder="Main Lab" required></label>
+      <label>GST state code<input name="state_code" maxlength="2" inputmode="numeric" placeholder="27"></label>
+      <label>Address<input name="address_line1" maxlength="200"></label>
+      <label>City<input name="city" maxlength="100"></label>
+      <label>PIN code<input name="pincode" maxlength="10" inputmode="numeric"></label>
+      <label>Phone<input name="phone" maxlength="40"></label>
+    </div>
+    <div class="form-actions"><button type="submit" class="btn primary">Add Warehouse</button></div>
+  </form>
+</section>
+
+{% elif tab == 'employees' %}
+<section class="settings-section">
+  <div class="section-head"><h2>Employees</h2><span class="muted small">Badge codes can be printed as QR codes or barcodes</span></div>
+  <div class="table-scroll">
+    <table>
+      <thead><tr><th>Badge</th><th>Name</th><th>Designation</th><th>Warehouse</th><th>Phone</th><th>Joined</th><th>Active</th></tr></thead>
+      <tbody>
+        {% for employee in employees %}
+        <tr><td class="strong">{{ employee.code }}</td><td>{{ employee.name }}</td>
+          <td>{{ employee.designation or "-" }}</td><td>{{ employee.warehouse.name if employee.warehouse else "-" }}</td>
+          <td>{{ employee.phone or "-" }}</td><td>{{ employee.joined_on.strftime("%d %b %Y") if employee.joined_on else "-" }}</td>
+          <td>{{ "Yes" if employee.is_active else "No" }}</td></tr>
+        {% else %}<tr><td colspan="7" class="empty">No employees yet.</td></tr>{% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+<section class="form-section compact-form-section">
+  <div class="section-head"><h2>Add employee</h2></div>
+  <form method="post" action="/settings/employees" class="master-form">
+    <input type="hidden" name="csrf_token" value="{{ csrf }}">
+    <div class="form-grid">
+      <label>Badge code<input name="code" maxlength="30" autocomplete="off" required></label>
+      <label>Full name<input name="name" maxlength="120" required></label>
+      <label>Designation<input name="designation" maxlength="80"></label>
+      <label>Warehouse<select name="warehouse_id"><option value="">All / unassigned</option>{% for warehouse in warehouses if warehouse.is_active %}<option value="{{ warehouse.id }}">{{ warehouse.name }}</option>{% endfor %}</select></label>
+      <label>Phone<input name="phone" maxlength="40"></label>
+      <label>Email<input type="email" name="email" maxlength="120"></label>
+      <label>Joined on<input type="date" name="joined_on"></label>
+    </div>
+    <div class="form-actions"><button type="submit" class="btn primary">Add Employee</button></div>
+  </form>
+</section>
+
+{% elif tab == 'users' %}
+<section class="settings-section">
+  <div class="section-head"><h2>Users &amp; Roles</h2><span class="muted small">Owners control access; managers run operations; clerks handle stock</span></div>
+  <div class="table-scroll">
+    <table>
+      <thead><tr><th>Username</th><th>Name</th><th>Role</th><th>Warehouse</th><th>Employee</th><th>Last sign-in</th><th>Status</th><th>Actions</th></tr></thead>
+      <tbody>
+        {% for account in users %}
+        <tr><td class="strong">{{ account.username }}</td><td>{{ account.full_name }}</td>
+          <td>{{ Role.LABELS.get(account.role, account.role) }}</td>
+          <td>{{ account.warehouse.name if account.warehouse else "All" }}</td>
+          <td>{{ account.employee.name if account.employee else "-" }}</td>
+          <td class="nowrap">{{ account.last_login_at.strftime("%d %b %Y, %H:%M") if account.last_login_at else "Never" }}</td>
+          <td>{{ "Active" if account.is_active else "Inactive" }}</td>
+          <td class="action-cell">
+            <form method="post" action="/settings/users/{{ account.id }}/reset-password" class="inline">
+              <input type="hidden" name="csrf_token" value="{{ csrf }}">
+              <button type="submit" class="link-button">Reset password</button>
+            </form>
+            {% if account.id != user.id %}
+            <form method="post" action="/settings/users/{{ account.id }}/toggle" class="inline">
+              <input type="hidden" name="csrf_token" value="{{ csrf }}">
+              <button type="submit" class="link-button">{{ "Deactivate" if account.is_active else "Activate" }}</button>
+            </form>
+            {% endif %}
+          </td></tr>
+        {% else %}<tr><td colspan="8" class="empty">No user accounts yet.</td></tr>{% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+<section class="form-section compact-form-section">
+  <div class="section-head"><h2>Add user account</h2></div>
+  <form method="post" action="/settings/users" class="master-form">
+    <input type="hidden" name="csrf_token" value="{{ csrf }}">
+    <div class="form-grid">
+      <label>Username<input name="username" maxlength="60" autocomplete="off" required></label>
+      <label>Full name<input name="full_name" maxlength="120" required></label>
+      <label>Role<select name="role" required>{% for role in Role.ALL %}<option value="{{ role }}">{{ Role.LABELS[role] }}</option>{% endfor %}</select></label>
+      <label>Default warehouse<select name="warehouse_id"><option value="">All warehouses</option>{% for warehouse in warehouses if warehouse.is_active %}<option value="{{ warehouse.id }}">{{ warehouse.name }}</option>{% endfor %}</select></label>
+      <label>Linked employee<select name="employee_id"><option value="">No employee link</option>{% for employee in employees if employee.is_active %}<option value="{{ employee.id }}">{{ employee.name }} ({{ employee.code }})</option>{% endfor %}</select></label>
+    </div>
+    <p class="muted small">A temporary password is generated and shown once after creation. The user must change it at first sign-in.</p>
+    <div class="form-actions"><button type="submit" class="btn primary">Create User</button></div>
+  </form>
+</section>
+{% endif %}
+{% endblock %}

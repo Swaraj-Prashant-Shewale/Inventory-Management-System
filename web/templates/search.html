@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% set active = 'search' %}
+{% block title %}Search{% endblock %}
+{% block content %}
+<div class="screen-head">
+  <div>
+    <h1 class="screen-title">SEARCH</h1>
+    {% if search_query and summary %}<span class="muted">{{ summary }}</span>{% endif %}
+  </div>
+</div>
+
+<form class="global-search-form" action="/search" method="get" role="search">
+  <label class="sr-only" for="global-search-input">Search records</label>
+  <input id="global-search-input" type="search" name="q" value="{{ search_query }}"
+         placeholder="Search items, orders, partners or employees" maxlength="100"
+         autocomplete="off" autofocus>
+  <button class="btn primary" type="submit">Search</button>
+</form>
+
+{% if error %}<p class="form-error" role="alert">{{ error }}</p>{% endif %}
+
+{% if search_query and not error %}
+<section class="search-results" aria-label="Search results">
+  <div class="table-scroll">
+    <table>
+      <thead><tr><th>Type</th><th>Record</th><th>Details</th><th class="result-action">Open</th></tr></thead>
+      <tbody>
+        {% for row in rows %}
+        <tr class="{{ 'exact-result' if row.result.exact else '' }}">
+          <td><span class="result-kind kind-{{ row.result.kind }}">{{ row.result.type_label }}</span></td>
+          <td><a class="result-name" href="{{ row.url }}">{{ row.result.label }}</a>{% if row.result.exact %}<span class="exact-label">Exact</span>{% endif %}</td>
+          <td class="muted">{{ row.result.detail }}</td>
+          <td class="result-action"><a href="{{ row.url }}">Open</a></td>
+        </tr>
+        {% else %}
+        <tr><td colspan="4" class="empty">No records match &ldquo;{{ search_query }}&rdquo;.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endif %}
+{% endblock %}

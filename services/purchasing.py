@@ -15,6 +15,8 @@ from database.models import (
     PurchaseOrder,
     PurchaseOrderLine,
     PurchaseStatus,
+    Serial,
+    SerialStatus,
     Supplier,
     SupplierReturn,
     SupplierReturnLine,
@@ -392,12 +394,81 @@ def create_supplier_return(supplier, warehouse, lines, user=None, order=None,
                            reason=None, notes=None) -> SupplierReturn:
     """Send goods back to a supplier, removing them from stock.
 
-    `lines`: [{item, quantity, unit_cost (optional), lot (optional)}]
+    A linked order constrains each item to its received quantity minus earlier returns.
+    Serialized units must currently be in stock at the selected warehouse and are marked
+    RETURNED after their stock movement posts.
     """
     auth.require(user, auth.PERM_RECEIVE_GOODS, "return goods to a supplier")
-    lines = [line for line in lines if _dec(line.get("quantity")) > 0]
-    if not lines:
+    if supplier is None or warehouse is None:
+        raise PurchasingError("Choose the supplier and warehouse for this return.")
+    if order is not None and (order.supplier_id != supplier.id
+                              or order.warehouse_id != warehouse.id):
+        raise PurchasingError(
+            "The linked purchase order must belong to the selected supplier and warehouse.")
+
+    prepared = []
+    requested = {}
+    serial_keys = set()
+    for line in lines:
+        quantity = _dec(line.get("quantity"))
+        if not quantity.is_finite() or quantity <= 0:
+            continue
+        item = line.get("item")
+        if item is None:
+            raise PurchasingError("Every supplier return line needs an item.")
+        serials = [str(value).strip() for value in (line.get("serials") or [])
+                   if str(value).strip()]
+        if len(serials) != len(set(serials)):
+            raise PurchasingError(f"{item.name}: each serial number can appear only once.")
+        if item.is_serial_tracked:
+            if quantity != quantity.to_integral_value() or len(serials) != int(quantity):
+                raise PurchasingError(
+                    f"{item.name}: enter one serial number for each returned unit.")
+            serial_records = []
+            for number in serials:
+                key = (item.id, number)
+                if key in serial_keys:
+                    raise PurchasingError(f"Serial {number} appears on more than one line.")
+                serial_keys.add(key)
+                serial = Serial.get_or_none(
+                    (Serial.item == item) & (Serial.serial_number == number))
+                if (serial is None or serial.status != SerialStatus.IN_STOCK
+                        or serial.warehouse_id != warehouse.id):
+                    raise PurchasingError(
+                        f"Serial {number} is not in stock at {warehouse.name} for {item.name}.")
+                serial_records.append(serial)
+        else:
+            if serials:
+                raise PurchasingError(f"{item.name} is not configured for serial tracking.")
+            serial_records = []
+        entry = dict(line)
+        entry.update({"item": item, "quantity": quantity, "serials": serials,
+                      "serial_records": serial_records})
+        prepared.append(entry)
+        requested[item.id] = requested.get(item.id, ZERO) + quantity
+    if not prepared:
         raise PurchasingError("A supplier return needs at least one line.")
+
+    if order is not None:
+        received = {}
+        for order_line in order.lines:
+            received[order_line.item_id] = (
+                received.get(order_line.item_id, ZERO)
+                + _dec(order_line.received_quantity))
+        previous = {}
+        prior_lines = (SupplierReturnLine.select(SupplierReturnLine)
+                       .join(SupplierReturn)
+                       .where(SupplierReturn.order == order))
+        for line in prior_lines:
+            previous[line.item_id] = previous.get(line.item_id, ZERO) + _dec(line.quantity)
+        for item_id, quantity in requested.items():
+            remaining = received.get(item_id, ZERO) - previous.get(item_id, ZERO)
+            if quantity > remaining:
+                item = next(entry["item"] for entry in prepared
+                            if entry["item"].id == item_id)
+                raise PurchasingError(
+                    f"{item.name}: only {inventory.fmt_qty(max(ZERO, remaining))} "
+                    "received unit(s) remain eligible for return on this order.")
 
     with db.atomic():
         record = SupplierReturn.create(
@@ -407,15 +478,13 @@ def create_supplier_return(supplier, warehouse, lines, user=None, order=None,
             created_by=user,
         )
         total = ZERO
-        for line in lines:
-            item = line["item"]
-            quantity = _dec(line["quantity"])
-            unit_cost = _dec(line.get("unit_cost", item.avg_cost))
-            explicit_lot = line.get("lot")
+        for entry in prepared:
+            item = entry["item"]
+            quantity = entry["quantity"]
+            unit_cost = _dec(entry.get("unit_cost", item.avg_cost))
+            explicit_lot = entry.get("lot")
 
-            # Split the return across lots when the item is lot-tracked and no specific
-            # lot was named. Posting a single lot=None movement would drop on_hand without
-            # ever decrementing LotStock, leaving lot quantities above on_hand forever.
+            # Split lot-tracked returns across available stock in expiry order.
             if item.is_lot_tracked and explicit_lot is None:
                 allocation = inventory.allocate_fefo(item, warehouse, quantity)
             else:
@@ -428,18 +497,26 @@ def create_supplier_return(supplier, warehouse, lines, user=None, order=None,
                     lot=lot, user=user, supplier=supplier,
                     notes=reason or "Returned to supplier",
                 )
-                SupplierReturnLine.create(supplier_return=record, item=item,
-                                          quantity=lot_quantity, unit_cost=unit_cost,
-                                          lot=lot)
+                SupplierReturnLine.create(
+                    supplier_return=record, item=item, quantity=lot_quantity,
+                    unit_cost=unit_cost, lot=lot,
+                )
+            if entry["serials"]:
+                returned_serials = inventory.ship_serials(item, entry["serials"])
+                for serial in returned_serials:
+                    serial.status = SerialStatus.RETURNED
+                    serial.warehouse = None
+                    serial.save()
             total += quantity * unit_cost
 
         record.total = total
         record.save()
 
-    auth.record_audit(user, "CREATE", "SupplierReturn", record.id,
-                      f"{record.number}: returned {len(lines)} line(s) to {supplier.name}")
+    auth.record_audit(
+        user, "CREATE", "SupplierReturn", record.id,
+        f"{record.number}: returned {len(prepared)} line(s) to {supplier.name}",
+    )
     return record
-
 
 def open_orders(warehouse=None, supplier=None):
     query = PurchaseOrder.select().where(PurchaseOrder.status.in_(PurchaseStatus.OPEN))

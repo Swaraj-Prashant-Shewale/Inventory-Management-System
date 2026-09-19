@@ -1,0 +1,132 @@
+/* W2 operational screens: master data, staff access, and movement logs. */
+.form-section, .settings-section {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 18px;
+  margin-bottom: 16px;
+}
+
+.form-section h2, .settings-section h2 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.master-form label {
+  display: block;
+  color: #4A5157;
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 14px;
+}
+
+.master-form input:not([type=checkbox]),
+.master-form select,
+.master-form textarea,
+.compact-label input {
+  display: block;
+  width: 100%;
+  margin-top: 4px;
+  padding: 9px 11px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--card);
+  color: var(--text);
+  font: inherit;
+}
+
+.master-form input:focus,
+.master-form select:focus,
+.master-form textarea:focus,
+.compact-label input:focus {
+  outline: 2px solid var(--teal);
+  outline-offset: 0;
+}
+
+.master-form textarea { resize: vertical; }
+.wide-field { grid-column: 1 / -1; }
+.check-row {
+  display: flex;
+  gap: 22px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.compact-form-section { max-width: 1050px; }
+
+.settings-tabs {
+  display: flex;
+  gap: 2px;
+  border-bottom: 2px solid var(--border);
+  margin-bottom: 16px;
+  overflow-x: auto;
+}
+
+.settings-tabs a {
+  color: var(--text);
+  text-decoration: none;
+  font-weight: 600;
+  white-space: nowrap;
+  padding: 10px 14px;
+  border-bottom: 3px solid transparent;
+}
+
+.settings-tabs a:hover { color: var(--teal); }
+.settings-tabs a.active {
+  color: var(--teal);
+  border-bottom-color: var(--teal);
+}
+
+.settings-section {
+  padding: 0;
+  overflow: hidden;
+}
+.settings-section .section-head { padding: 18px 18px 8px; }
+.action-cell { white-space: nowrap; }
+.action-cell form + form { margin-left: 12px; }
+
+.credential-list {
+  margin: 16px 0;
+  max-width: 620px;
+}
+.credential-list div {
+  display: grid;
+  grid-template-columns: 160px minmax(0, 1fr);
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--row-line);
+}
+.credential-list dt {
+  color: var(--muted);
+  font-weight: 600;
+}
+.credential-list dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.credential-list code {
+  background: #F2FAFB;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 4px 7px;
+  font-size: 16px;
+}
+
+.log-filters .compact-label {
+  color: var(--muted);
+  font-size: 12px;
+}
+.log-filters input[type=date] { min-width: 142px; }
+.btn.quiet { border-color: var(--border); }
+
+@media (max-width: 700px) {
+  .wide-field { grid-column: auto; }
+  .check-row {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .credential-list div {
+    grid-template-columns: 1fr;
+    gap: 4px;
+  }
+}

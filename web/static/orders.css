@@ -1,0 +1,83 @@
+/* W2 purchase and sales order workflows. */
+.order-table,
+.order-lines,
+.order-summary {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  margin-bottom: 16px;
+  overflow: hidden;
+}
+
+.order-lines .section-head {
+  padding: 16px 18px 8px;
+}
+
+.order-lines select,
+.order-lines input,
+.order-lines textarea {
+  width: 100%;
+  min-width: 110px;
+  padding: 8px 9px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  background: var(--card);
+  color: var(--text);
+  font: inherit;
+}
+
+.order-lines select { min-width: 260px; }
+.order-lines textarea {
+  min-width: 170px;
+  resize: vertical;
+}
+
+.order-lines input:focus,
+.order-lines select:focus,
+.order-lines textarea:focus {
+  outline: 2px solid var(--teal);
+  outline-offset: 0;
+}
+
+.order-summary { padding: 14px 18px; }
+.order-summary dl {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px 20px;
+  margin: 0;
+}
+.order-summary dl div { min-width: 0; }
+.order-summary dt {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+  margin-bottom: 3px;
+}
+.order-summary dd {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.status-tag {
+  display: inline-block;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 3px 7px;
+  background: #F7F9F9;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.plain-notes {
+  border-top: 1px solid var(--border);
+  padding: 14px 0;
+}
+.plain-notes h2 { margin: 0 0 6px; font-size: 16px; }
+.plain-notes p { margin: 0; white-space: pre-wrap; }
+
+@media (max-width: 700px) {
+  .order-summary dl { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}

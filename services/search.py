@@ -10,6 +10,7 @@ from peewee import JOIN
 
 from database.models import (
     Customer,
+    CustomerReturn,
     Employee,
     Item,
     PurchaseOrder,
@@ -17,12 +18,15 @@ from database.models import (
     SalesOrder,
     SalesStatus,
     Supplier,
+    SupplierReturn,
     Warehouse,
 )
 
 ITEM = "item"
 SALES_ORDER = "sales_order"
 PURCHASE_ORDER = "purchase_order"
+CUSTOMER_RETURN = "customer_return"
+SUPPLIER_RETURN = "supplier_return"
 CUSTOMER = "customer"
 SUPPLIER = "supplier"
 EMPLOYEE = "employee"
@@ -31,6 +35,8 @@ TYPE_LABELS = {
     ITEM: "Item",
     SALES_ORDER: "Sales Order",
     PURCHASE_ORDER: "Purchase Order",
+    CUSTOMER_RETURN: "Customer Return",
+    SUPPLIER_RETURN: "Supplier Return",
     CUSTOMER: "Customer",
     SUPPLIER: "Supplier",
     EMPLOYEE: "Employee",
@@ -111,6 +117,30 @@ def search(term, limit_per_type=6, include_inactive=False):
             f"{order.warehouse.name}",
             order, order.number.upper() == upper))
 
+    # --- Returns --------------------------------------------------------------------
+    customer_returns = (CustomerReturn.select(CustomerReturn, Customer, Warehouse)
+                        .join(Customer).switch(CustomerReturn).join(Warehouse)
+                        .where((CustomerReturn.number ** like)
+                               | (Customer.name ** like)
+                               | (CustomerReturn.reason ** like)))
+    for record in customer_returns.order_by(CustomerReturn.id.desc()).limit(limit_per_type):
+        results.append(Result(
+            CUSTOMER_RETURN, record.number,
+            f"{record.customer.name} - "
+            f"{'Restocked' if record.restock else 'Scrapped'} - "
+            f"{record.warehouse.name}",
+            record, record.number.upper() == upper))
+
+    supplier_returns = (SupplierReturn.select(SupplierReturn, Supplier, Warehouse)
+                        .join(Supplier).switch(SupplierReturn).join(Warehouse)
+                        .where((SupplierReturn.number ** like)
+                               | (Supplier.name ** like)
+                               | (SupplierReturn.reason ** like)))
+    for record in supplier_returns.order_by(SupplierReturn.id.desc()).limit(limit_per_type):
+        results.append(Result(
+            SUPPLIER_RETURN, record.number,
+            f"{record.supplier.name} - Returned - {record.warehouse.name}",
+            record, record.number.upper() == upper))
     # --- Partners and people --------------------------------------------------------
     customers = Customer.select().where(
         (Customer.name ** like) | (Customer.code ** like) | (Customer.gstin ** like)
@@ -155,7 +185,8 @@ def search(term, limit_per_type=6, include_inactive=False):
 
     # Exact matches first, then by type in the order defined above.
     order_index = {kind: index for index, kind in enumerate(
-        [ITEM, SALES_ORDER, PURCHASE_ORDER, CUSTOMER, SUPPLIER, EMPLOYEE])}
+        [ITEM, SALES_ORDER, PURCHASE_ORDER, CUSTOMER_RETURN, SUPPLIER_RETURN,
+         CUSTOMER, SUPPLIER, EMPLOYEE])}
     results.sort(key=lambda r: (not r.exact, order_index.get(r.kind, 99),
                                 r.label.lower()))
     return results

@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% set active = 'operations' %}
+{% block title %}{{ adjustment.number }}{% endblock %}
+{% block content %}
+<div class="screen-head"><div><h1 class="screen-title">{{ adjustment.number }}</h1><span class="muted">{{ adjustment.warehouse.name }} &middot; {{ AdjustmentReason.LABELS.get(adjustment.reason, adjustment.reason) }}</span></div><a class="btn" href="/operations?tab=adjustments">All Adjustments</a></div>
+{% if saved %}<div class="status-banner success" role="status">Completed <strong>{{ saved }}</strong>.</div>{% endif %}{% if error %}<p class="form-error" role="alert">{{ error }}</p>{% endif %}
+<section class="order-summary"><dl><div><dt>Status</dt><dd>{{ "Approved" if adjustment.approved_at else "Awaiting approval" }}</dd></div><div><dt>Date</dt><dd>{{ adjustment.adjustment_date.strftime("%d %b %Y") }}</dd></div><div><dt>Raised by</dt><dd>{{ adjustment.created_by.full_name if adjustment.created_by else "-" }}</dd></div><div><dt>Approved by</dt><dd>{{ adjustment.approved_by.full_name if adjustment.approved_by else "-" }}</dd></div><div><dt>Net value</dt><dd>&#8377;{{ "{:,.2f}".format(net_value) }}</dd></div></dl></section>
+<section class="order-lines"><div class="table-scroll"><table><thead><tr><th>Item</th><th class="num">Change</th><th class="num">Unit cost</th><th>Note</th></tr></thead><tbody>{% for line in lines %}<tr><td><span class="strong">{{ line.item.name }}</span><br><span class="muted small">{{ line.item.sku }}</span></td><td class="num {{ 'danger' if line.quantity_delta < 0 else '' }}">{{ '+' if line.quantity_delta > 0 else '' }}{{ "{:g}".format(line.quantity_delta) }}</td><td class="num">&#8377;{{ "{:,.2f}".format(line.unit_cost) }}</td><td>{{ line.note or "-" }}</td></tr>{% endfor %}</tbody></table></div></section>
+{% if not adjustment.approved_at and can(auth.PERM_APPROVE_ADJUSTMENT) %}<form method="post" action="/operations/adjustments/{{ adjustment.id }}/approve" class="form-actions"><input type="hidden" name="csrf_token" value="{{ csrf }}"><button class="btn primary" type="submit">Approve and Post Stock</button></form>{% endif %}
+{% if adjustment.notes %}<section class="plain-notes"><h2>Notes</h2><p>{{ adjustment.notes }}</p></section>{% endif %}
+{% endblock %}

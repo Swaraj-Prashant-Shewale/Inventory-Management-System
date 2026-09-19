@@ -5,7 +5,7 @@ from fastapi import APIRouter, Form, Request
 from fastapi.responses import RedirectResponse
 
 from services import auth, tenancy
-from web import security
+from web import ratelimit, security
 from web.context import (
     check_csrf,
     redirect,
@@ -46,6 +46,17 @@ def login_submit(request: Request, username: str = Form(""),
         return _login_page(context, status_code=400, username=username,
                            error="Your session expired — please try again.")
 
+    # Throttle per IP before any PBKDF2 work, so a flood of guesses can neither spray
+    # accounts nor pin the worker's CPU. A successful login clears the counter below.
+    ip = ratelimit.client_ip(request)
+    wait = ratelimit.LOGIN_LIMITER.retry_after(ip)
+    if wait:
+        response = _login_page(
+            context, status_code=429, username=username,
+            error=f"Too many sign-in attempts. Please wait {wait} seconds and try again.")
+        response.headers["Retry-After"] = str(wait)
+        return response
+
     tenant = tenancy.find_tenant_for_username(username)
     if tenant is None:
         # Run a dummy verification so a missing username costs the same time as a wrong
@@ -62,6 +73,7 @@ def login_submit(request: Request, username: str = Form(""),
     except auth.AuthError as exc:
         return _login_page(context, status_code=401, error=str(exc), username=username)
 
+    ratelimit.LOGIN_LIMITER.reset(ip)   # honest sign-in clears the failure counter
     response = RedirectResponse("/", status_code=303)
     security.set_cookie(response, security.SESSION_COOKIE,
                         security.issue_session(user.id, getattr(tenant, "id", 0)))

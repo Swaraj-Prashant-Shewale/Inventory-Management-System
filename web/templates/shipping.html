@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% set active = 'shipping' %}
+{% block title %}Shipping{% endblock %}
+{% block content %}
+<div class="screen-head"><div><h1 class="screen-title">SHIPPING</h1><span class="muted">Sales orders and outgoing goods</span></div>{% if can(auth.PERM_CREATE_SALES) %}<a class="btn primary" href="/shipping/orders/new">New Sales Order</a>{% endif %}</div>
+{% if saved %}<div class="status-banner success" role="status">Completed <strong>{{ saved }}</strong>.</div>{% endif %}
+<form class="filter-row" method="get" action="/shipping"><input type="search" name="q" value="{{ q }}" placeholder="Order number or customer"><select name="status"><option value="">All statuses</option>{% for value, label in SalesStatus.LABELS.items() %}<option value="{{ value }}" {{ 'selected' if status == value else '' }}>{{ label }}</option>{% endfor %}</select><button class="btn" type="submit">Apply</button><a class="btn quiet" href="/shipping">Clear</a></form>
+<section class="order-table"><div class="table-scroll"><table><thead><tr><th>Order</th><th>Customer</th><th>Warehouse</th><th>Ordered</th><th>Promised</th><th>Status</th><th>Payment</th><th class="num">Total</th><th>Action</th></tr></thead><tbody>{% for order in orders %}<tr><td class="strong"><a href="/shipping/{{ order.id }}">{{ order.number }}</a></td><td>{{ order.customer.name }}</td><td>{{ order.warehouse.name }}</td><td>{{ order.order_date.strftime("%d %b %Y") }}</td><td>{{ order.promised_date.strftime("%d %b %Y") if order.promised_date else "-" }}</td><td><span class="status-tag">{{ SalesStatus.LABELS.get(order.status, order.status) }}</span></td><td>{{ order.payment_status|title }}</td><td class="num">&#8377;{{ "{:,.2f}".format(order.total or 0) }}</td><td><a href="/shipping/{{ order.id }}">Open</a></td></tr>{% else %}<tr><td colspan="9" class="empty">No sales orders match these filters.</td></tr>{% endfor %}</tbody></table></div></section>
+{% endblock %}

@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% set active = 'logs' %}
+{% block title %}Recent Logs{% endblock %}
+{% block content %}
+<div class="screen-head">
+  <h1 class="screen-title">RECENT LOGS</h1>
+  <span class="muted">{{ movements|length }} movement(s), newest first</span>
+</div>
+
+{% if error %}<p class="form-error" role="alert">{{ error }}</p>{% endif %}
+
+<form method="get" action="/logs" class="filter-row log-filters">
+  <input type="search" name="q" value="{{ q }}"
+         placeholder="Item, SKU, document or truck">
+  <select name="warehouse">
+    <option value="0">All warehouses</option>
+    {% for warehouse in warehouses %}
+    <option value="{{ warehouse.id }}"
+            {{ 'selected' if selected_warehouse == warehouse.id else '' }}>
+      {{ warehouse.name }}
+    </option>
+    {% endfor %}
+  </select>
+  <select name="direction">
+    <option value="">All directions</option>
+    <option value="IN" {{ 'selected' if direction == Direction.IN else '' }}>Check in</option>
+    <option value="OUT" {{ 'selected' if direction == Direction.OUT else '' }}>Check out</option>
+  </select>
+  <select name="doc_type">
+    <option value="">All movement types</option>
+    {% for value, label in doc_labels.items() %}
+    <option value="{{ value }}" {{ 'selected' if doc_type == value else '' }}>{{ label }}</option>
+    {% endfor %}
+  </select>
+  <label class="compact-label">From
+    <input type="date" name="date_from" value="{{ date_from }}">
+  </label>
+  <label class="compact-label">To
+    <input type="date" name="date_to" value="{{ date_to }}">
+  </label>
+  <button type="submit" class="btn">Apply</button>
+  <a href="/logs" class="btn quiet">Clear</a>
+</form>
+
+<section class="movement-history">
+  <div class="table-scroll">
+    <table>
+      <thead>
+        <tr>
+          <th>Time</th><th>Direction</th><th>Item</th><th class="num">Quantity</th>
+          <th class="num">Balance</th>{% if show_cost %}<th class="num">Unit cost</th>{% endif %}
+          <th>Warehouse</th><th>Movement</th><th>By</th><th>Reference</th><th>Notes</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for movement in movements %}
+        <tr>
+          <td class="muted nowrap">{{ movement.timestamp.strftime("%d %b %Y, %H:%M") }}</td>
+          <td><span class="movement-pill {{ 'in' if movement.direction == Direction.IN else 'out' }}">
+            {{ movement.direction }}</span></td>
+          <td><span class="strong">{{ movement.item.name }}</span><br>
+              <span class="muted small">{{ movement.item.sku }}</span></td>
+          <td class="num">{{ "{:g}".format(movement.quantity) }}</td>
+          <td class="num">{{ "{:g}".format(movement.balance_after) }}</td>
+          {% if show_cost %}<td class="num">{{ "{:,.2f}".format(movement.unit_cost or 0) }}</td>{% endif %}
+          <td>{{ movement.warehouse.name }}</td>
+          <td>{{ doc_labels.get(movement.doc_type, movement.doc_type) }}</td>
+          <td>{{ movement.user.full_name if movement.user else (movement.employee.name if movement.employee else "-") }}</td>
+          <td class="nowrap">{{ movement.doc_number or "-" }}</td>
+          <td>{{ movement.notes or "-" }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="11" class="empty">No stock movements match these filters.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+<p class="muted small">Showing at most 500 movements. Stock movements are an immutable ledger.</p>
+{% endblock %}

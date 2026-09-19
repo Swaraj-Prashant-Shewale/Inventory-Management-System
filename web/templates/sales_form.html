@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% set active = 'shipping' %}
+{% block title %}New Sales Order{% endblock %}
+{% block content %}
+<div class="screen-head"><div><h1 class="screen-title">NEW SALES ORDER</h1><span class="muted">Prepare goods for a customer</span></div><a class="btn" href="/shipping">Back</a></div>
+{% if error %}<p class="form-error" role="alert">{{ error }}</p>{% endif %}
+<form method="post" action="/shipping/orders" class="master-form"><input type="hidden" name="csrf_token" value="{{ csrf }}">
+  <section class="form-section"><div class="section-head"><h2>Order details</h2>{% if can(auth.PERM_MANAGE_PARTNERS) %}<a href="/shipping/customers/new">New customer</a>{% endif %}</div><div class="form-grid">
+    <label>Customer<select name="customer_id" required><option value="">Choose customer</option>{% for customer in customers %}<option value="{{ customer.id }}" {{ 'selected' if values.customer_id|string == customer.id|string else '' }}>{{ customer.name }} ({{ customer.code }})</option>{% endfor %}</select></label>
+    <label>Ship from<select name="warehouse_id" required><option value="">Choose warehouse</option>{% for warehouse in warehouses %}<option value="{{ warehouse.id }}" {{ 'selected' if values.warehouse_id|string == warehouse.id|string else '' }}>{{ warehouse.name }}</option>{% endfor %}</select></label>
+    <label>Promised date<input type="date" name="promised_date" value="{{ values.promised_date }}"></label><label>Truck registration<input name="truck_hsrp" value="{{ values.truck_hsrp }}" maxlength="20"></label>
+    <label>Delivery PIN<input name="delivery_pincode" value="{{ values.delivery_pincode }}" maxlength="10"></label><label class="wide-field">Delivery address<textarea name="delivery_address" rows="2">{{ values.delivery_address }}</textarea></label><label class="wide-field">Notes<textarea name="notes" rows="2" maxlength="500">{{ values.notes }}</textarea></label>
+  </div></section>
+  <section class="order-lines"><div class="section-head"><h2>Items</h2><span class="muted small">Up to five lines per order</span></div><div class="table-scroll"><table><thead><tr><th>#</th><th>Item</th><th>Quantity</th><th>Unit price</th><th>Discount %</th></tr></thead><tbody>{% for line in lines %}<tr><td>{{ loop.index }}</td><td><select name="item_id"><option value="">Choose item</option>{% for item in items %}<option value="{{ item.id }}" {{ 'selected' if line.item_id|string == item.id|string else '' }}>{{ item.sku }} &middot; {{ item.name }}</option>{% endfor %}</select></td><td><input type="number" name="quantity" value="{{ line.quantity }}" min="0.001" step="0.001"></td><td><input type="number" name="price" value="{{ line.price }}" min="0" step="0.01" placeholder="Use price list"></td><td><input type="number" name="discount" value="{{ line.discount }}" min="0" max="100" step="0.01"></td></tr>{% endfor %}</tbody></table></div></section>
+  <div class="form-actions"><a class="btn" href="/shipping">Cancel</a><button class="btn primary" type="submit">Create Draft Order</button></div>
+</form>
+{% endblock %}

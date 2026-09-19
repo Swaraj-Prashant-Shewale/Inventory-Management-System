@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}Owner password reset{% endblock %}
+{% block content %}
+<h1 class="screen-title">OWNER PASSWORD RESET</h1>
+<div class="card">
+  <p>Owner access for <b>{{ slug }}</b> has been reset.</p>
+  <div class="credentials">
+    <p>Hand these to the client's owner — the password is shown <b>once</b>:</p>
+    <p class="cred-line">Username: <code>{{ owner_username }}</code></p>
+    <p class="cred-line">Temporary password: <code>{{ owner_password }}</code></p>
+    <p class="muted small">They sign in at this site's normal address and must
+      choose their own password immediately.</p>
+  </div>
+  <p><a href="/admin" class="btn">Back to clients</a></p>
+</div>
+{% endblock %}

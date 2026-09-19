@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% set active = 'operations' %}
+{% block title %}Stock Operations{% endblock %}
+{% block content %}
+<div class="screen-head"><div><h1 class="screen-title">STOCK OPERATIONS</h1><span class="muted">Controlled changes outside normal receiving and shipping</span></div>
+  {% if tab == 'adjustments' %}<a class="btn primary" href="/operations/adjustments/new">New Adjustment</a>{% elif tab == 'transfers' %}<a class="btn primary" href="/operations/transfers/new">New Transfer</a>{% endif %}
+</div>
+<nav class="settings-tabs" aria-label="Stock operations">
+  {% if 'adjustments' in allowed_tabs %}<a href="/operations?tab=adjustments" class="{{ 'active' if tab == 'adjustments' else '' }}">Adjustments</a>{% endif %}
+  {% if 'transfers' in allowed_tabs %}<a href="/operations?tab=transfers" class="{{ 'active' if tab == 'transfers' else '' }}">Transfers</a>{% endif %}
+  {% if 'counts' in allowed_tabs %}<a href="/operations?tab=counts" class="{{ 'active' if tab == 'counts' else '' }}">Cycle Counts</a>{% endif %}
+  {% if can(auth.PERM_CREATE_SALES) or can(auth.PERM_RECEIVE_GOODS) %}<a href="/operations/returns">Returns</a>{% endif %}
+</nav>
+{% if saved %}<div class="status-banner success" role="status">Completed <strong>{{ saved }}</strong>.</div>{% endif %}{% if error %}<p class="form-error" role="alert">{{ error }}</p>{% endif %}
+
+{% if tab == 'adjustments' %}
+<section class="order-table"><div class="table-scroll"><table><thead><tr><th>Number</th><th>Date</th><th>Warehouse</th><th>Reason</th><th class="num">Lines</th><th>Status</th><th>Raised by</th><th>Action</th></tr></thead><tbody>
+  {% for adjustment in adjustments %}<tr><td class="strong"><a href="/operations/adjustments/{{ adjustment.id }}">{{ adjustment.number }}</a></td><td>{{ adjustment.adjustment_date.strftime("%d %b %Y") }}</td><td>{{ adjustment.warehouse.name }}</td><td>{{ AdjustmentReason.LABELS.get(adjustment.reason, adjustment.reason) }}</td><td class="num">{{ adjustment.lines|length }}</td><td><span class="status-tag">{{ "Approved" if adjustment.approved_at else "Awaiting approval" }}</span></td><td>{{ adjustment.created_by.full_name if adjustment.created_by else "-" }}</td><td><a href="/operations/adjustments/{{ adjustment.id }}">Open</a></td></tr>
+  {% else %}<tr><td colspan="8" class="empty">No stock adjustments recorded.</td></tr>{% endfor %}
+</tbody></table></div></section>
+{% elif tab == 'transfers' %}
+<section class="order-table"><div class="table-scroll"><table><thead><tr><th>Number</th><th>From</th><th>To</th><th class="num">Lines</th><th>Status</th><th>Dispatched</th><th>Received</th><th>Truck</th><th>Action</th></tr></thead><tbody>
+  {% for transfer in transfers %}<tr><td class="strong"><a href="/operations/transfers/{{ transfer.id }}">{{ transfer.number }}</a></td><td>{{ transfer.from_warehouse.name }}</td><td>{{ transfer.to_warehouse.name }}</td><td class="num">{{ transfer.lines|length }}</td><td><span class="status-tag">{{ TransferStatus.LABELS.get(transfer.status, transfer.status) }}</span></td><td>{{ transfer.dispatch_date.strftime("%d %b %Y") if transfer.dispatch_date else "-" }}</td><td>{{ transfer.received_date.strftime("%d %b %Y") if transfer.received_date else "-" }}</td><td>{{ transfer.truck_hsrp or "-" }}</td><td><a href="/operations/transfers/{{ transfer.id }}">Open</a></td></tr>
+  {% else %}<tr><td colspan="9" class="empty">No warehouse transfers recorded.</td></tr>{% endfor %}
+</tbody></table></div></section>
+{% else %}
+<section class="form-section compact-form-section"><div class="section-head"><h2>Start cycle count</h2><span class="muted small">Snapshots every stocked item at the selected warehouse</span></div><form method="post" action="/operations/counts" class="master-form"><input type="hidden" name="csrf_token" value="{{ csrf }}"><div class="form-grid"><label>Warehouse<select name="warehouse_id" required><option value="">Choose warehouse</option>{% for warehouse in warehouses %}<option value="{{ warehouse.id }}">{{ warehouse.name }}</option>{% endfor %}</select></label><label>Notes<input name="notes" maxlength="500"></label></div><div class="form-actions"><button class="btn primary" type="submit">Start Count</button></div></form></section>
+<section class="order-table"><div class="table-scroll"><table><thead><tr><th>Number</th><th>Date</th><th>Warehouse</th><th class="num">Items</th><th>Status</th><th>Counted by</th><th>Action</th></tr></thead><tbody>
+  {% for count in counts %}<tr><td class="strong"><a href="/operations/counts/{{ count.id }}">{{ count.number }}</a></td><td>{{ count.count_date.strftime("%d %b %Y") }}</td><td>{{ count.warehouse.name }}</td><td class="num">{{ count.lines|length }}</td><td><span class="status-tag">{{ CountStatus.LABELS.get(count.status, count.status) }}</span></td><td>{{ count.counted_by.full_name if count.counted_by else "-" }}</td><td><a href="/operations/counts/{{ count.id }}">Open</a></td></tr>
+  {% else %}<tr><td colspan="7" class="empty">No cycle counts recorded.</td></tr>{% endfor %}
+</tbody></table></div></section>
+{% endif %}
+{% endblock %}

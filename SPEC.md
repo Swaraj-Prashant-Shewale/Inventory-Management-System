@@ -123,18 +123,21 @@ expiry), `LotStock` (lot × warehouse), `Serial`
 
 ## 6. Deployment status
 
-**Database: live.** Supabase project `rsoevmbycvvmnmqyztbt` (`ap-southeast-2`,
+**Database: live.** Supabase project `<your-project-ref>` (`<your-region>`,
 PostgreSQL 17.6). Schema created and seeded; verified by re-running the service suites
 against it in a throwaway schema. Connection goes through the session pooler — see the
-README for the two Supabase gotchas that cost real time to diagnose.
+README for the two Supabase gotchas that cost real time to diagnose. (The real project ref
+and region are kept out of this repo; they live only in your local `.env`.)
 
 ## 7. Open items
 
-1. **Restricted database role.** Every warehouse PC currently needs the `postgres`
-   password in a plaintext `.env`. A role with only DML rights should replace it — and
-   because RLS is enabled on all 41 tables, that role needs `BYPASSRLS` or policies.
-2. **Network restrictions.** Allowlisting the warehouses' public IPs would make a leaked
-   password unusable from outside your sites. Needs those IPs.
+1. ~~**Restricted database role.**~~ **Done.** The app runs as `inventory_app`, a
+   least-privilege role (`BYPASSRLS`, no DDL, append-only `stock_movement`/`audit_log`),
+   created and verified by `security_setup.py`. The `postgres` superuser password is used
+   only for setup/provisioning and never ships.
+2. **Network restrictions.** Allowlisting the host's (and operator's) public IP would make
+   a leaked password unusable from anywhere else. Deferred until the host IP is known —
+   the highest-value control still outstanding, along with backups.
 3. Company legal name, GSTIN, registered address and state — required on GST invoices.
 4. Warehouse list with each site's state (drives the CGST/SGST vs IGST split).
 5. Financial year start (assumed 1 April) and invoice number format (assumed `INV/26-27/0001`).

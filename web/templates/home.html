@@ -5,16 +5,24 @@
 <h1 class="screen-title">HOME</h1>
 
 <div class="tile-row">
+  <a class="tile movement-in" href="/lab-movements?direction=IN">
+    <span class="tile-value">+</span>
+    <span class="tile-label">Check In</span>
+  </a>
+  <a class="tile movement-out" href="/lab-movements?direction=OUT">
+    <span class="tile-value">&minus;</span>
+    <span class="tile-label">Check Out</span>
+  </a>
   <a class="tile" href="/inventory">
-    <span class="tile-value">{{ counts.items }}</span>
+    <span class="tile-value">{{ counts["items"] }}</span>
     <span class="tile-label">Items</span>
   </a>
   <a class="tile" href="/coming/receiving">
-    <span class="tile-value">{{ counts.open_purchases }}</span>
+    <span class="tile-value">{{ counts["open_purchases"] }}</span>
     <span class="tile-label">Open purchase orders</span>
   </a>
   <a class="tile" href="/coming/shipping">
-    <span class="tile-value">{{ counts.open_sales }}</span>
+    <span class="tile-value">{{ counts["open_sales"] }}</span>
     <span class="tile-label">Open sales orders</span>
   </a>
   {% if stock_value is not none %}

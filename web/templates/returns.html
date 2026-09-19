@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% set active = 'operations' %}
+{% block title %}Returns{% endblock %}
+{% block content %}
+<div class="screen-head">
+  <div><h1 class="screen-title">RETURNS</h1><span class="muted">Goods returned by customers or sent back to suppliers</span></div>
+  {% if kind == 'customer' %}<a class="btn primary" href="/operations/returns/customer/new">New Customer Return</a>{% else %}<a class="btn primary" href="/operations/returns/supplier/new">New Supplier Return</a>{% endif %}
+</div>
+<nav class="settings-tabs" aria-label="Stock operations">
+  {% if can(auth.PERM_ADJUST_STOCK) or can(auth.PERM_APPROVE_ADJUSTMENT) %}<a href="/operations?tab=adjustments">Adjustments</a>{% endif %}
+  {% if can(auth.PERM_TRANSFER_STOCK) %}<a href="/operations?tab=transfers">Transfers</a>{% endif %}
+  {% if can(auth.PERM_CYCLE_COUNT) %}<a href="/operations?tab=counts">Cycle Counts</a>{% endif %}
+  <a href="/operations/returns" class="active">Returns</a>
+</nav>
+<nav class="return-tabs" aria-label="Return direction">
+  <a href="/operations/returns?kind=customer" class="{{ 'active' if kind == 'customer' else '' }}">Customer Returns</a>
+  <a href="/operations/returns?kind=supplier" class="{{ 'active' if kind == 'supplier' else '' }}">Supplier Returns</a>
+</nav>
+{% if saved %}<div class="status-banner success" role="status">Completed <strong>{{ saved }}</strong>.</div>{% endif %}
+<section class="order-table"><div class="table-scroll"><table>
+  <thead><tr><th>Number</th><th>Date</th><th>{{ 'Customer' if kind == 'customer' else 'Supplier' }}</th><th>Warehouse</th><th>Order</th><th>Reason</th>{% if kind == 'customer' %}<th>Disposition</th>{% endif %}<th class="num">Lines</th><th class="num">Value</th><th>Action</th></tr></thead>
+  <tbody>
+    {% for record in returns %}
+    <tr><td class="strong"><a href="/operations/returns/{{ kind }}/{{ record.id }}">{{ record.number }}</a></td><td>{{ record.return_date.strftime("%d %b %Y") }}</td><td>{{ record.customer.name if kind == 'customer' else record.supplier.name }}</td><td>{{ record.warehouse.name }}</td><td>{{ record.order.number if record.order else '-' }}</td><td>{{ record.reason or '-' }}</td>{% if kind == 'customer' %}<td>{{ 'Restocked' if record.restock else 'Scrapped' }}</td>{% endif %}<td class="num">{{ record.lines|length }}</td><td class="num">&#8377;{{ "{:,.2f}".format(record.total or 0) }}</td><td><a href="/operations/returns/{{ kind }}/{{ record.id }}">Open</a></td></tr>
+    {% else %}<tr><td colspan="{{ 10 if kind == 'customer' else 9 }}" class="empty">No {{ kind }} returns recorded.</td></tr>{% endfor %}
+  </tbody>
+</table></div></section>
+{% endblock %}
